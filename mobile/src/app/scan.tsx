@@ -29,16 +29,29 @@ export default function Scan() {
   const [saved, setSaved] = useState<Transaction | null>(null);
   const [pasted, setPasted] = useState('');
   const [busy, setBusy] = useState(false);
-  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntentContext();
+  const { hasShareIntent, shareIntent, resetShareIntent, error: shareError } = useShareIntentContext();
 
   // Shared from GPay / PhonePe / Messages (Share → Paylog): read it straight away.
   useEffect(() => {
     if (!hasShareIntent) return;
-    const file = shareIntent.files?.find((f) => (f.mimeType || '').startsWith('image/'));
+    // Prefer an image, but try any shared file: some apps don't report a MIME type.
+    const files = shareIntent.files || [];
+    const file = files.find((f) => (f.mimeType || '').startsWith('image/')) || files[0];
     const text = shareIntent.text || '';
+    const problem = shareError;
     resetShareIntent();
-    if (file) run(() => readImage(file.path));
-    else if (text.trim()) run(() => handleText(text));
+    if (file) {
+      run(() => readImage(file.path)).then(() => {
+        // If reading failed, say why the shared file couldn't be opened.
+        if (problem) setError((e) => (e ? `${e} (${problem})` : e));
+      });
+    } else if (text.trim()) {
+      run(() => handleText(text));
+    } else {
+      run(async () => {
+        throw new Error("Nothing we can read was shared. Share a screenshot of the payment, or the payment's text.");
+      });
+    }
   }, [hasShareIntent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function run(task: () => Promise<void>) {
@@ -59,7 +72,9 @@ export default function Scan() {
     setImage(uri);
     setStatus('Reading the screenshot on your phone…');
     if (!isSupported) throw new Error('Text reading is not available on this device. Paste the text below instead.');
-    const lines = await extractTextFromImage(uri);
+    // expo-text-extractor takes a content:// URI or a plain file path (not file://...).
+    const target = uri.startsWith('file://') ? decodeURIComponent(uri.slice('file://'.length)) : uri;
+    const lines = await extractTextFromImage(target);
     const text = lines.join('\n').trim();
     if (!text) throw new Error("We couldn't find any text in that image. Try a sharper screenshot, or paste the text.");
     await handleText(text);

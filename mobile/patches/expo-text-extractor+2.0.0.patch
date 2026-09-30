@@ -1,0 +1,26 @@
+diff --git a/node_modules/expo-text-extractor/android/build.gradle b/node_modules/expo-text-extractor/android/build.gradle
+index 7f1375c..dd2e867 100644
+--- a/node_modules/expo-text-extractor/android/build.gradle
++++ b/node_modules/expo-text-extractor/android/build.gradle
+@@ -41,6 +41,7 @@ android {
+     abortOnError false
+   }
+   dependencies {
+-    implementation 'com.google.android.gms:play-services-mlkit-text-recognition:19.0.1'
++    // Bundled model: works offline and on first use, without Google Play services downloading it.
++  implementation 'com.google.mlkit:text-recognition:16.0.1'
+   }
+ }
+diff --git a/node_modules/expo-text-extractor/android/src/main/java/expo/modules/textextractor/ExpoTextExtractorModule.kt b/node_modules/expo-text-extractor/android/src/main/java/expo/modules/textextractor/ExpoTextExtractorModule.kt
+index 3ffdf31..6919745 100644
+--- a/node_modules/expo-text-extractor/android/src/main/java/expo/modules/textextractor/ExpoTextExtractorModule.kt
++++ b/node_modules/expo-text-extractor/android/src/main/java/expo/modules/textextractor/ExpoTextExtractorModule.kt
+@@ -41,7 +41,7 @@ class ExpoTextExtractorModule : Module() {
+             promise.resolve(recognizedTexts)
+           }
+           .addOnFailureListener { error ->
+-            promise.reject(CodedException("err", error))
++            promise.reject(CodedException("ERR_TEXT_RECOGNITION", error.message ?: "Text recognition failed", error))
+           }
+       } catch (error: Exception) {
+         promise.reject(CodedException("UNKNOWN_ERROR", error.message ?: "Unknown error", error))

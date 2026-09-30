@@ -36,7 +36,8 @@ if ($LASTEXITCODE -ge 8) { throw "robocopy failed ($LASTEXITCODE)" }
 
 Set-Location $BuildDir
 Write-Host "2/4 Installing packages"
-npm ci --no-audit --no-fund
+# --include=dev: NODE_ENV=production would otherwise skip build tools such as patch-package.
+npm ci --include=dev --no-audit --no-fund
 if ($LASTEXITCODE) { throw "npm ci failed" }
 
 Write-Host "3/4 Generating the native Android project"
