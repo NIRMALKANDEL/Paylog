@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Paylog — Track Every Rupee{% endblock %}
+
+{% block public_content %}
+
+<section class="hero">
+    <div class="hero-inner">
+        <div class="hero-badge">Personal Finance Tracker</div>
+        <h1 class="hero-title">
+            Know where your<br>
+            <em>money goes</em>
+        </h1>
+        <p class="hero-subtitle">
+            Log expenses and income, set budgets that warn you before you overspend,
+            see a year of patterns at a glance, and plan the savings goals that matter.
+        </p>
+        <div class="hero-actions">
+            <a href="{{ url_for('auth.register') }}" class="btn-primary">Start tracking free</a>
+            <a href="{{ url_for('auth.login') }}" class="btn-ghost">Sign in</a>
+        </div>
+        <p class="hero-note">Free, private, and you stay signed in for 30 days on your phone.</p>
+    </div>
+    <div class="hero-visual" aria-hidden="true">
+        <div class="mock-card">
+            <div class="mock-card-header">
+                <span class="mock-label">This month</span>
+                <span class="mock-total">₹12,450</span>
+            </div>
+            <div class="mock-bars">
+                {% for cat, width, amt in [("Bills", 72, "₹4,500"), ("Food", 52, "₹3,200"), ("Health", 33, "₹2,050"), ("Transport", 28, "₹1,800")] %}
+                <div class="mock-bar-row">
+                    <span class="mock-cat">{{ cat }}</span>
+                    <div class="mock-bar-track"><div class="mock-bar" style="width: {{ width }}%"></div></div>
+                    <span class="mock-amt">{{ amt }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="mock-foot">
+                <span class="mock-pill status-good">{{ m.icon("check", 14) }} 72% of budget used</span>
+                <span class="mock-pill">Saved 28%</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="features">
+    <div class="features-inner">
+        {% for ico, title, body in [
+            ("list", "Log in seconds", "Expenses and income with categories, notes, search, filters and CSV import/export."),
+            ("chart", "Analyse your past", "Monthly trends, category breakdowns, weekday habits and plain-language insights."),
+            ("wallet", "Budgets that nudge", "Set an overall or per-category budget and see progress bars before you overshoot."),
+            ("target", "Savings goals", "Track progress toward goals and see exactly how much to set aside each month."),
+            ("repeat", "Recurring payments", "Rent, salary and subscriptions are logged automatically on schedule."),
+            ("calc", "Planning calculators", "Compound growth, goal planner, time-to-goal, emergency fund and loan EMI."),
+        ] %}
+        <div class="feature-card">
+            <div class="feature-icon">{{ m.icon(ico, 22) }}</div>
+            <h3 class="feature-title">{{ title }}</h3>
+            <p class="feature-body">{{ body }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="cta-section">
+    <div class="cta-inner">
+        <h2 class="cta-title">Ready to take control?</h2>
+        <p class="cta-body">Free, private and works beautifully on your phone. Pick a theme that feels like yours.</p>
+        <a href="{{ url_for('auth.register') }}" class="btn-primary">Create free account</a>
+    </div>
+</section>
+
+{% endblock %}

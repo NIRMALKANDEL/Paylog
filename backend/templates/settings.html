@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+
+{% block title %}Settings — Paylog{% endblock %}
+
+{% block content %}
+<header class="page-head">
+    <div>
+        <p class="eyebrow">Account</p>
+        <h1 class="page-title">Settings</h1>
+    </div>
+</header>
+
+<nav class="settings-nav chips">
+    <a href="#profile" class="chip">Profile</a>
+    <a href="#email" class="chip">Email</a>
+    <a href="#appearance" class="chip">Appearance</a>
+    <a href="#receipts" class="chip">Receipts</a>
+    <a href="#install" class="chip">Install app</a>
+    <a href="#security" class="chip">Security</a>
+    <a href="#data" class="chip">Your data</a>
+</nav>
+
+<section class="card" id="profile">
+    <h2 class="card-title">Profile</h2>
+    <form method="POST" action="{{ url_for('settings.profile') }}">
+        {{ m.csrf() }}
+        <div class="form-row">
+            <div class="form-group">
+                <label for="name">Name</label>
+                <input type="text" id="name" name="name" value="{{ current_user.name }}" class="form-input" maxlength="60" required>
+            </div>
+            <div class="form-group">
+                <label for="currency">Currency</label>
+                <select id="currency" name="currency" class="form-input">
+                    {% for code, (symbol, _, label) in currencies.items() %}
+                    <option value="{{ code }}" {% if current_user.currency == code %}selected{% endif %}>{{ symbol }} · {{ label }} ({{ code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <p class="muted small">Signed in as {{ current_user.email }}. Changing currency changes the symbol and number format only — amounts aren't converted.</p>
+        <div class="form-actions"><button type="submit" class="btn-primary">Save profile</button></div>
+    </form>
+</section>
+
+<section class="card" id="email">
+    <div class="card-head">
+        <h2 class="card-title">Email address</h2>
+        {% if current_user.email_verified %}<span class="status-tag status-good">{{ m.icon("check", 14) }} Confirmed</span>
+        {% elif mail_enabled %}<span class="status-tag status-warning">{{ m.icon("alert", 14) }} Not confirmed</span>{% endif %}
+    </div>
+    <p class="muted small">Currently <strong>{{ current_user.email }}</strong>. This is where password-reset links are sent.</p>
+    {% if mail_enabled and not current_user.email_verified %}
+    <form method="POST" action="{{ url_for('auth.resend_verification') }}" class="inline-form">
+        {{ m.csrf() }}
+        <input type="hidden" name="next" value="{{ url_for('settings.index') }}#email">
+        <button type="submit" class="btn-ghost btn-sm">Resend confirmation link</button>
+    </form>
+    {% endif %}
+    <form method="POST" action="{{ url_for('settings.change_email') }}" class="email-form">
+        {{ m.csrf() }}
+        <div class="form-row">
+            <div class="form-group">
+                <label for="new_email">New email</label>
+                <input type="email" id="new_email" name="email" class="form-input" maxlength="254" autocomplete="email" required>
+            </div>
+            <div class="form-group">
+                <label for="email_password">Current password</label>
+                <input type="password" id="email_password" name="password" class="form-input" autocomplete="current-password" required>
+            </div>
+        </div>
+        <div class="form-actions"><button type="submit" class="btn-primary">Change email</button></div>
+    </form>
+</section>
+
+<section class="card" id="appearance">
+    <h2 class="card-title">Appearance</h2>
+    <form method="POST" action="{{ url_for('settings.appearance') }}" data-theme-form>
+        {{ m.csrf() }}
+        <fieldset class="form-group">
+            <legend>Theme</legend>
+            <div class="theme-grid">
+                {% for key, t in themes.items() %}
+                <label class="theme-option">
+                    <input type="radio" name="theme" value="{{ key }}" {% if current_user.theme == key %}checked{% endif %}>
+                    <span class="theme-swatch" style="--sw1: {{ t.accent }}; --sw2: {{ t.accent_2 }}"><span></span><span></span></span>
+                    <span class="theme-name">{{ t.label }}</span>
+                </label>
+                {% endfor %}
+            </div>
+        </fieldset>
+        <fieldset class="form-group">
+            <legend>Mode</legend>
+            <div class="segmented">
+                {% for mode in modes %}
+                <label><input type="radio" name="mode" value="{{ mode }}" {% if current_user.mode == mode %}checked{% endif %}><span>{{ mode|title }}</span></label>
+                {% endfor %}
+            </div>
+        </fieldset>
+        <fieldset class="form-group">
+            <legend>Custom accent colour</legend>
+            <div class="accent-row">
+                <label class="checkbox"><input type="checkbox" name="use_custom_accent" value="1" {% if current_user.accent %}checked{% endif %} data-accent-toggle> Override the theme's accent</label>
+                <input type="color" name="accent" value="{{ current_user.accent or theme.accent }}" class="color-input" aria-label="Accent colour" data-accent-input>
+            </div>
+            <p class="muted small">Changes preview instantly; save to keep them.</p>
+        </fieldset>
+        <div class="form-actions"><button type="submit" class="btn-primary">Save appearance</button></div>
+    </form>
+</section>
+
+<section class="card" id="receipts">
+    <h2 class="card-title">{{ m.icon("scan", 18) }} Receipts</h2>
+    <form method="POST" action="{{ url_for('settings.receipt_settings') }}">
+        {{ m.csrf() }}
+        <label class="checkbox">
+            <input type="checkbox" name="auto_save_receipts" value="1" {% if current_user.auto_save_receipts %}checked{% endif %}>
+            Save receipts automatically when the amount, date and payee are read clearly
+        </label>
+        <p class="muted small">You'll get an Undo button right after. Unclear receipts and possible duplicates always show the form first.</p>
+        <div class="form-actions"><button type="submit" class="btn-primary">Save</button></div>
+    </form>
+</section>
+
+<section class="card" id="install">
+    <h2 class="card-title">{{ m.icon("download", 18) }} Install on your phone</h2>
+    <p class="muted" data-install-installed hidden>{{ m.icon("check", 14) }} Paylog is installed and open as an app on this device.</p>
+    <div data-install-ready hidden>
+        <p class="muted">Add Paylog to your home screen so it opens like a normal app and appears in the Share menu of
+           Google Pay, PhonePe and Paytm.</p>
+        <div class="form-actions"><button type="button" class="btn-primary" data-install-app-now>{{ m.icon("download", 16) }} Install Paylog</button></div>
+    </div>
+    <div data-install-help>
+        <p class="muted">Your browser hasn't offered the install popup here. Install it from the browser menu instead:</p>
+        <ul class="install-help">
+            <li><strong>Android, Chrome:</strong> tap <strong>⋮</strong> at the right end of <em>Chrome's address bar</em>
+                (scroll up if you can't see it) → <strong>Add to Home screen</strong> → <strong>Install</strong>.</li>
+            <li><strong>Realme / Oppo / OnePlus:</strong> if nothing appears on the home screen, open phone
+                <strong>Settings → Apps → Chrome → Permissions</strong> and allow <strong>“Home screen shortcuts”</strong>
+                (sometimes called “Create desktop shortcuts”), then try again.</li>
+            <li><strong>Opened from WhatsApp / Gmail?</strong> Tap <strong>⋮ → Open in Chrome</strong> first. In-app browsers can't install.</li>
+            <li><strong>iPhone, Safari:</strong> tap <strong>Share □↑ → Add to Home Screen</strong>.</li>
+        </ul>
+    </div>
+</section>
+
+<section class="card" id="security">
+    <h2 class="card-title">Change password</h2>
+    <form method="POST" action="{{ url_for('settings.password') }}">
+        {{ m.csrf() }}
+        <div class="form-group">
+            <label for="current_password">Current password</label>
+            <input type="password" id="current_password" name="current_password" class="form-input" autocomplete="current-password" required>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="new_password">New password</label>
+                <input type="password" id="new_password" name="new_password" class="form-input" autocomplete="new-password" minlength="8" required>
+            </div>
+            <div class="form-group">
+                <label for="confirm_password">Confirm new password</label>
+                <input type="password" id="confirm_password" name="confirm_password" class="form-input" autocomplete="new-password" required>
+            </div>
+        </div>
+        <div class="form-actions"><button type="submit" class="btn-primary">Update password</button></div>
+    </form>
+</section>
+
+<section class="card" id="data">
+    <h2 class="card-title">Your data</h2>
+    <p class="muted">{{ stats.count }} transactions{% if stats.first %} since {{ stats.first }}{% endif %}.
+       Read how your data is handled in the <a class="link" href="{{ url_for('main.privacy') }}">privacy policy</a>.</p>
+    <div class="button-row">
+        <a href="{{ url_for('transactions.export_csv') }}" class="btn-ghost btn-sm">{{ m.icon("download", 16) }} Transactions (CSV)</a>
+        <a href="{{ url_for('settings.export_json') }}" class="btn-ghost btn-sm">{{ m.icon("download", 16) }} Full backup (JSON)</a>
+        <a href="{{ url_for('transactions.import_csv') }}" class="btn-ghost btn-sm">{{ m.icon("upload", 16) }} Import CSV</a>
+    </div>
+</section>
+
+<section class="card danger-card" id="danger">
+    <h2 class="card-title">Delete account</h2>
+    <p class="muted">Permanently deletes your account and every transaction, budget, goal and recurring item. This can't be undone.</p>
+    <form method="POST" action="{{ url_for('settings.delete_account') }}" class="delete-form" data-confirm="Permanently delete your account and all data?">
+        {{ m.csrf() }}
+        <input type="password" name="password" class="form-input input-sm" placeholder="Confirm with your password" autocomplete="current-password" aria-label="Password" required>
+        <button type="submit" class="btn-danger btn-sm">Delete my account</button>
+    </form>
+</section>
+{% endblock %}

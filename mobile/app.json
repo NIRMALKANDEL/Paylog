@@ -1,0 +1,142 @@
+{
+  "expo": {
+    "name": "Paylog",
+    "slug": "paylog",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "paylog",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#f7f6f3",
+    "ios": {
+      "bundleIdentifier": "com.nirmalkandel.paylog",
+      "supportsTablet": true,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Paylog reads payment screenshots you choose so it can fill in the amount, date and payee for you.",
+        "NSCameraUsageDescription": "Paylog can photograph a paper receipt to fill in the amount for you."
+      }
+    },
+    "android": {
+      "package": "com.nirmalkandel.paylog",
+      "versionCode": 1,
+      "allowBackup": false,
+      "softwareKeyboardLayoutMode": "resize",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundColor": "#0e5e56"
+      },
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 96,
+          "backgroundColor": "#f7f6f3",
+          "dark": {
+            "image": "./assets/images/splash-icon.png",
+            "backgroundColor": "#111211"
+          }
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Paylog reads payment screenshots you choose so it can fill in the amount, date and payee for you.",
+          "cameraPermission": "Paylog can photograph a paper receipt to fill in the amount for you.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-sharing",
+      [
+        "expo-share-intent",
+        {
+          "androidIntentFilters": [
+            "text/*",
+            "image/*"
+          ],
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsImageWithMaxCount": 1,
+            "NSExtensionActivationSupportsText": true
+          },
+          "iosAppGroupIdentifier": "group.com.nirmalkandel.paylog",
+          "iosShareExtensionName": "Paylog"
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "QuickNote",
+              "label": "Paylog quick note",
+              "description": "Tap and type an expense like “250 lunch”.",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "maxResizeWidth": "600dp",
+              "maxResizeHeight": "300dp",
+              "resizeMode": "horizontal|vertical",
+              "previewImage": "./assets/images/widget-preview.png",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
+      ],
+      [
+        "expo-widgets",
+        {
+          "bundleIdentifier": "com.nirmalkandel.paylog.widgets",
+          "groupIdentifier": "group.com.nirmalkandel.paylog",
+          "widgets": [
+            {
+              "name": "QuickNote",
+              "displayName": "Paylog quick note",
+              "description": "Tap and type an expense like “250 lunch”.",
+              "ios": {
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
+      ],
+      "./plugins/withReleaseSigning"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

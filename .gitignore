@@ -1,0 +1,11 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+
+# Secrets: never commit signing keys or env files
+*.jks
+*.keystore
+.env
