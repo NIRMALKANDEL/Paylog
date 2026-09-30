@@ -132,7 +132,8 @@
           }
         }
       ],
-      "./plugins/withReleaseSigning"
+      "./plugins/withReleaseSigning",
+      "./plugins/withWorkManagerFix"
     ],
     "experiments": {
       "typedRoutes": true,

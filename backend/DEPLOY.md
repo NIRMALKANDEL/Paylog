@@ -16,7 +16,7 @@ PythonAnywhere → **Consoles** → **Bash**, then paste:
 
 ```bash
 cd ~
-git clone https://github.com/NIRMALKANDEL/Paylog.git
+git clone https://github.com/NIRMALKANDEL/PAYLOG.git Paylog
 cd Paylog/backend
 python3.12 -m venv venv
 source venv/bin/activate

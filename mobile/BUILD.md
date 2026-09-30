@@ -7,24 +7,21 @@ The `android/` and `ios/` folders are generated from `app.json` by `npx expo pre
 Needs Java 21 and the Android SDK (already installed on this PC: `C:\Program Files\Microsoft\jdk-21...` and
 `%LOCALAPPDATA%\Android\Sdk`).
 
-Windows limits path length and this project lives deep inside OneDrive, so build from a short drive letter.
-In **PowerShell**:
+One command does everything. In **PowerShell**, from the `mobile` folder:
 
 ```powershell
-subst P: "$env:USERPROFILE\OneDrive\Desktop\paylog"      # once per PC restart
-cd P:\mobile
-npm install
-npx expo prebuild --platform android --clean
-cd android
-$env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-21.0.12.101-hotspot"
-$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
-$env:NODE_ENV = "production"
-.\gradlew.bat assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+.\scripts\build-android.ps1
 ```
 
-The APK is `P:\mobile\android\app\build\outputs\apk\release\app-release.apk`.
+It copies the source to `C:\pl\mobile` (a short local folder: React Native's native build breaks on long Windows
+paths, and building inside OneDrive would sync gigabytes of build files), installs packages, generates the
+Android project and builds. The finished APK is copied to **`mobile\dist\paylog.apk`**.
 
-To use a different server: `$env:EXPO_PUBLIC_API_URL = "https://your-server"` before `gradlew`.
+- Test build for the Android emulator, talking to the backend on this PC (`http://10.0.2.2:5001`):
+  `.\scripts\build-android.ps1 -Emulator`
+- Different server: `.\scripts\build-android.ps1 -ApiUrl https://your-server`
+
+The first build takes 10–20 minutes; later ones are faster.
 
 ### Signing key (keep it safe!)
 
@@ -37,7 +34,7 @@ in `C:\Users\NIRMAL\.gradle\gradle.properties` (lines starting `PAYLOG_UPLOAD_`)
 
 ### Install on your phone
 
-1. Copy `app-release.apk` to the phone (USB cable, Google Drive, or email it to yourself).
+1. Copy `dist\paylog.apk` to the phone (USB cable, Google Drive, or email it to yourself).
 2. Tap it. If Android asks, allow **Install unknown apps** for the app you opened it from.
 3. Open **Paylog** and sign in with your usual account.
 4. Add the widget: long-press an empty spot on the home screen → **Widgets** → **Paylog** → drag
@@ -49,7 +46,7 @@ iOS apps can only be built on a Mac with Xcode, or in the cloud with Expo's **EA
 
 1. Create a free account at https://expo.dev.
 2. Join the **Apple Developer Program** (US$99/year). Apple requires it to install your own app on an iPhone.
-3. In `P:\mobile` run `npx eas-cli@latest build --platform ios`. EAS asks for your Apple login, creates the
+3. In the `mobile` folder run `npx eas-cli@latest build --platform ios`. EAS asks for your Apple login, creates the
    certificates, and builds the app including the widget and the share extension.
 4. Install it through **TestFlight**, or submit it to the App Store with `npx eas-cli@latest submit --platform ios`.
 
