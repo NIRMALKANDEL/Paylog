@@ -54,13 +54,11 @@ os.environ["MAIL_FROM"] = "Paylog <your-gmail@gmail.com>"                      #
 If something goes wrong, put the three Web-tab boxes back to the `Spendly` paths, change `path` in the WSGI file
 back, and click **Reload**. The old site comes straight back.
 
-## 6. Scheduled backup task (if you set one up)
+## 6. Backups
 
-**Tasks** tab → edit the command to:
-
-```
-cd /home/devNirmal/Paylog/backend && venv/bin/flask --app app backup-db
-```
+Paylog makes a daily copy of the database by itself (in `BACKUP_DIR`, newest 14 kept) the first time
+someone uses the site each day. Free accounts can't run scheduled tasks, so nothing else is needed. On a paid
+account you can also add a task: `cd /home/devNirmal/Paylog/backend && venv/bin/flask --app app backup-db`
 
 ## Updating later
 
@@ -68,4 +66,7 @@ cd /home/devNirmal/Paylog/backend && venv/bin/flask --app app backup-db
 cd ~/Paylog && git pull && cd backend && source venv/bin/activate && pip install -r requirements.txt
 ```
 
-Then **Reload** on the Web tab. Every 3 months: Web tab → **Run until 3 months from today**.
+Then **Reload** on the Web tab.
+
+**Free account: once a month** go to the Web tab and click **Run until 1 month from today**, or the site is
+switched off (PythonAnywhere emails you a week before).
