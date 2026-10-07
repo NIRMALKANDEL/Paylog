@@ -1,7 +1,8 @@
 'use no memo';
-// Android home-screen widget. Android widgets can't contain a text box, so
-// the note area opens Paylog's quick-add screen with the keyboard already up;
-// after saving, the app closes itself and you're back on the home screen.
+// Android home-screen widget. Android widgets can't contain a text box, so a
+// tap opens the quick note: a native card over the home screen with the
+// keyboard up (modules/paylog-quicknote). It saves straight to the server
+// without opening the app, then closes; this widget redraws with the new total.
 import { FlexWidget, ImageWidget, TextWidget } from 'react-native-android-widget';
 
 export type WidgetData = {
@@ -9,9 +10,10 @@ export type WidgetData = {
   spent?: string; // "₹12,450"
   month?: string; // "September"
   last?: string; // "Saved ₹250 · Food"
+  pending?: number; // notes typed offline, not sent yet
 };
 
-const QUICK_URI = 'paylog://quick?from=widget';
+const QUICK_URI = 'paylog-note://add';
 const SCAN_URI = 'paylog://scan?from=widget';
 
 function palette(dark: boolean) {
@@ -71,7 +73,7 @@ function Note({ data, dark }: { data: WidgetData; dark: boolean }) {
           maxLines={1}
         />
         <TextWidget
-          text={data.signedIn ? (data.last ?? 'e.g. 250 lunch · 2k rent · salary 65000') : 'Tap to open the app'}
+          text={data.signedIn ? subtitle(data) : 'Tap to open the app'}
           style={{ fontSize: 12, color: c.muted, marginTop: 2 }}
           maxLines={1}
           truncate="END"
@@ -96,6 +98,11 @@ function Note({ data, dark }: { data: WidgetData; dark: boolean }) {
       ) : null}
     </FlexWidget>
   );
+}
+
+function subtitle(data: WidgetData) {
+  if (data.pending) return `${data.pending} note${data.pending === 1 ? '' : 's'} waiting for internet`;
+  return data.last ?? 'e.g. 250 lunch · 2k rent · salary 65000';
 }
 
 export function QuickNoteWidget(data: WidgetData) {

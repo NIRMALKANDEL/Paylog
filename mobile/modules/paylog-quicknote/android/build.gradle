@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.nirmalkandel.paylog'
+version = '1.0.0'
+
+android {
+  namespace "com.nirmalkandel.paylog.quicknote"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}
+
+dependencies {
+  // Same version react-native-android-widget uses (see plugins/withWorkManagerFix.js).
+  implementation 'androidx.work:work-runtime:2.8.1'
+}

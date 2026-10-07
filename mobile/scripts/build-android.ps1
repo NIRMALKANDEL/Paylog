@@ -31,7 +31,9 @@ if ($Emulator) {
 }
 
 Write-Host "1/4 Copying source to $BuildDir"
-robocopy $source $BuildDir /MIR /XD node_modules android ios .expo .git /NFL /NDL /NJH /NJS /NP | Out-Null
+# android/ and ios/ are excluded by full path: a bare name would also skip local
+# native modules' own android/ folders (modules/*/android).
+robocopy $source $BuildDir /MIR /XD node_modules (Join-Path $source "android") (Join-Path $source "ios") .expo .git /NFL /NDL /NJH /NJS /NP | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "robocopy failed ($LASTEXITCODE)" }
 
 Set-Location $BuildDir

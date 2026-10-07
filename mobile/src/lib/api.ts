@@ -1,5 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
+import { setQuickNoteSession } from '../../modules/paylog-quicknote';
+
 /** Paylog server. Override at build time with EXPO_PUBLIC_API_URL. */
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://devnirmal.pythonanywhere.com').replace(/\/$/, '');
 
@@ -21,8 +23,11 @@ let onUnauthorized: (() => void) | null = null;
 
 // The sign-in token lives in the phone's secure storage (Android Keystore /
 // iOS Keychain), so it survives the app being closed, killed or updated.
+// The Android widget's quick note saves without starting the app, so it gets
+// its own (Keystore-encrypted) copy of the sign-in, kept in step here.
 export async function loadToken() {
   token = await SecureStore.getItemAsync(TOKEN_KEY);
+  setQuickNoteSession(API_URL, token);
   return token;
 }
 
@@ -30,6 +35,7 @@ export async function saveToken(value: string | null) {
   token = value;
   if (value) await SecureStore.setItemAsync(TOKEN_KEY, value);
   else await SecureStore.deleteItemAsync(TOKEN_KEY);
+  setQuickNoteSession(API_URL, value);
 }
 
 export function getToken() {

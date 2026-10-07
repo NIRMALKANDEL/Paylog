@@ -591,10 +591,29 @@ def quick_preview():
     return jsonify(ok=True, **tx_routes.describe_quick(clean))
 
 
+def written_day(raw):
+    if not raw:
+        return None
+    try:
+        day = parse_date(raw)
+    except ValueError:
+        fail("written_on must be a date (YYYY-MM-DD).")
+    # -1: the phone's time zone may already be on tomorrow's date.
+    if not -1 <= (today() - day).days <= 60:
+        fail("written_on must be within the last 60 days.")
+    return day
+
+
 @bp.post("/transactions/quick")
 def quick_add():
-    """One line of text -> a saved transaction. Used by the app and its home-screen widget."""
-    clean, error = tx_routes.quick_parse(body().get("q", ""))
+    """One line of text -> a saved transaction. Used by the app and its home-screen widget.
+
+    Optional `written_on` (YYYY-MM-DD): the day the note was typed, for notes the
+    widget saved offline and sends later. The phone's own date also fixes "today"
+    when the phone is a day ahead of the server (India just after midnight vs UTC).
+    """
+    data = body()
+    clean, error = tx_routes.quick_parse(data.get("q", ""), written_day(data.get("written_on")))
     if error:
         fail(error)
     tx_id = tx_routes.insert_transaction(g.user["id"], clean)

@@ -358,8 +358,10 @@ def save_import(user_id, clean_rows):
 # Quick add                                                           #
 # ------------------------------------------------------------------ #
 
-def quick_parse(text):
-    fields, error = parse_quick(text, today())
+def quick_parse(text, written_on=None):
+    """`written_on` anchors "yesterday"/"monday" to the day a note was typed
+    (an offline widget note can reach the server a day or two later)."""
+    fields, error = parse_quick(text, written_on or today())
     if error:
         return None, error
     return validate_transaction(fields)

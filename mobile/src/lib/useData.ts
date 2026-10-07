@@ -1,9 +1,14 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { api, errorMessage } from './api';
 
-/** GET `path` whenever the screen comes into focus; keeps showing old data while refreshing. */
+/**
+ * GET `path` whenever the screen comes into focus or the app comes back to the
+ * front (the widget's quick note may have saved entries meanwhile); keeps
+ * showing old data while refreshing.
+ */
 export function useData<T>(path: string | null) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +37,10 @@ export function useData<T>(path: string | null) {
   useFocusEffect(
     useCallback(() => {
       load();
+      const sub = AppState.addEventListener('change', (state) => {
+        if (state === 'active') load();
+      });
+      return () => sub.remove();
     }, [load]),
   );
 

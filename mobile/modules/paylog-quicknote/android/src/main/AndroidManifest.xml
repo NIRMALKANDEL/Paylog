@@ -1,0 +1,26 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.INTERNET" />
+  <application>
+    <!-- The widget's quick note: a small card over the home screen. It runs
+         without starting React Native, has its own task (so the app itself
+         never comes to the front) and leaves no entry in Recents. Exported
+         because the widget opens it with an implicit paylog-note:// intent
+         (Android 14+ only delivers those to exported activities); it reads
+         nothing from the intent. -->
+    <activity
+      android:name="com.nirmalkandel.paylog.quicknote.QuickNoteActivity"
+      android:exported="true"
+      android:theme="@style/PaylogQuickNote"
+      android:taskAffinity="com.nirmalkandel.paylog.quicknote"
+      android:launchMode="singleTask"
+      android:excludeFromRecents="true"
+      android:windowSoftInputMode="stateAlwaysVisible|adjustResize"
+      android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|uiMode">
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:scheme="paylog-note" />
+      </intent-filter>
+    </activity>
+  </application>
+</manifest>

@@ -1,10 +1,12 @@
 """The JSON API used by the Paylog mobile app."""
 
 import io
+from datetime import timedelta
 
 import pytest
 
 from database.db import get_db
+from tests.conftest import TODAY
 
 PASSWORD = "secret123"
 
@@ -272,6 +274,22 @@ def test_quick_add_from_widget(api):
     assert saved.json["transaction"]["category"] == "Food"
     assert api.post("/transactions/quick", {"q": "no amount"}).status_code == 400
     assert api.get("/transactions/quick/preview?q=").json["ok"] is False
+
+
+def test_quick_add_written_offline_keeps_its_day(api):
+    two_days_ago = (TODAY - timedelta(days=2)).isoformat()
+    three_days_ago = (TODAY - timedelta(days=3)).isoformat()
+    plain = api.post("/transactions/quick", {"q": "250 lunch", "written_on": two_days_ago})
+    assert plain.status_code == 201 and plain.json["transaction"]["date"] == two_days_ago
+    relative = api.post("/transactions/quick", {"q": "180 uber yesterday", "written_on": two_days_ago})
+    assert relative.json["transaction"]["date"] == three_days_ago
+    ahead = (TODAY + timedelta(days=1)).isoformat()  # phone already past midnight
+    assert api.post("/transactions/quick", {"q": "250 lunch", "written_on": ahead}).json["transaction"]["date"] == ahead
+    future = (TODAY + timedelta(days=2)).isoformat()
+    assert api.post("/transactions/quick", {"q": "250 lunch", "written_on": future}).status_code == 400
+    old = (TODAY - timedelta(days=61)).isoformat()
+    assert api.post("/transactions/quick", {"q": "250 lunch", "written_on": old}).status_code == 400
+    assert api.post("/transactions/quick", {"q": "250 lunch", "written_on": "soon"}).status_code == 400
 
 
 def test_csv_import(api):

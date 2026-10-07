@@ -23,8 +23,13 @@ a home-screen widget, sign-ins that last 30 days, and no demo data.
   savings goals, recurring transactions, analytics with charts and plain-language insights,
   5 calculators (savings growth, goal planner, time to goal, emergency fund, loan EMI).
 - **Quick note:** type `250 lunch`, `salary 65000`, `2k rent yesterday` — one entry per line, with a live preview.
-- **Home-screen widget** (Android + iOS): a note card showing this month's spending. Tap it and the quick note
-  opens with the keyboard up; save and you're back on the home screen (Android).
+- **Home-screen widget** (Android + iOS): a note card showing this month's spending.
+  - **Android:** tap it and a small note card slides up over the home screen with the keyboard open. Type
+    `250 lunch`, tap Save: it's added to your account straight away **without opening the app**, the widget's
+    total updates, and you can Undo for a few seconds. Offline, notes wait on the phone and are sent as soon as
+    you're back online (keeping the day you wrote them). Unsaved text stays as a draft, like a notes app.
+    (Android widgets can't contain a text box themselves; this card is the closest thing.)
+  - **iPhone:** tapping the widget opens the app's quick note with the keyboard up.
 - **Receipt scanning:** pick a GPay / PhonePe / Paytm / BHIM screenshot or photo a bill. The text is read **on the
   phone** (Google ML Kit / Apple Vision); clearly read payments are saved instantly with Undo.
 - **Design:** light / dark / system, 6 colour themes, 7 currencies (₹ with Indian grouping).

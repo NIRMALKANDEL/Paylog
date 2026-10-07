@@ -1,5 +1,6 @@
-// The notes-style quick add. Opened by the home-screen widget
-// (paylog://quick?from=widget), the "+" tab and the dashboard box.
+// The notes-style quick add inside the app: the "+" tab, the dashboard box and
+// the iOS widget (paylog://quick?from=widget). The Android widget uses the
+// native quick note instead (modules/paylog-quicknote), which never opens the app.
 // Each line is one entry: "250 lunch", "salary 65000", "2k rent yesterday".
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -10,6 +11,7 @@ import { Icon } from '@/components/Icon';
 import { Button, Muted, Notice, Row } from '@/components/ui';
 import { api, errorMessage } from '@/lib/api';
 import { useUser } from '@/lib/auth';
+import { toISO } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import { useTheme } from '@/lib/theme';
 import type { QuickPreview, Transaction } from '@/lib/types';
@@ -85,7 +87,8 @@ export default function Quick() {
     const done: Transaction[] = [];
     try {
       for (const line of lines) {
-        const res = await api<{ transaction: Transaction }>('/transactions/quick', { body: { q: line } });
+        // The phone's date, so "today" is right even when the server's clock (UTC) is still on yesterday.
+        const res = await api<{ transaction: Transaction }>('/transactions/quick', { body: { q: line, written_on: toISO(new Date()) } });
         done.push(res.transaction);
       }
       const last = done[done.length - 1];
