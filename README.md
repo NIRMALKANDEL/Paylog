@@ -4,6 +4,11 @@
 <p align="center"><b>Know where your money goes.</b><br>
 Personal finance tracker for Android, iPhone and the web, with a home-screen quick-note widget.</p>
 
+<p align="center">
+<b><a href="https://github.com/NIRMALKANDEL/Paylog/releases/latest">Download for Android</a></b> ·
+<b><a href="https://devnirmal.pythonanywhere.com">Open the web app</a></b> (iPhone: Share → Add to Home Screen)
+</p>
+
 ---
 
 Paylog is the next version of Spendly: a new name and logo, a real native mobile app (React Native / Expo),
