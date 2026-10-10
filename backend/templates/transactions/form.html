@@ -64,8 +64,8 @@
         <input type="hidden" name="reference" value="{{ form.reference or '' }}">
         {% endif %}
         <fieldset class="segmented" aria-label="Type">
-            <label><input type="radio" name="kind" value="expense" {% if kind == 'expense' %}checked{% endif %}><span>Expense</span></label>
-            <label><input type="radio" name="kind" value="income" {% if kind == 'income' %}checked{% endif %}><span>Income</span></label>
+            <label><input type="radio" name="kind" value="expense" {% if kind == 'expense' %}checked{% endif %}><span>− Debit</span></label>
+            <label><input type="radio" name="kind" value="income" {% if kind == 'income' %}checked{% endif %}><span>+ Credit</span></label>
         </fieldset>
 
         <div class="form-group">

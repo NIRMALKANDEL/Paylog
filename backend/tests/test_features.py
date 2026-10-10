@@ -182,7 +182,8 @@ def test_dashboard_totals(auth_client):
     auth_client.add_tx(amount="1000", kind="income", category="Salary", day="2026-09-01")
     auth_client.add_tx(amount="250", category="Food", day="2026-09-02")
     page = auth_client.get("/dashboard").data.decode()
-    assert "₹1,000" in page and "₹250" in page and "₹750" in page and "75%" in page
+    assert "₹1,000" in page and "₹250" in page and "+₹750" in page
+    assert "Credit this month" in page and "Debit this month" in page and "Credit minus debit" in page
 
 
 def test_analytics_ranges(auth_client):

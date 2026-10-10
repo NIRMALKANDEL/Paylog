@@ -11,8 +11,8 @@
     </div>
     <div class="page-actions">
         <a href="{{ url_for('receipts.scan') }}" class="btn-ghost btn-sm">{{ m.icon("scan", 16) }} Scan receipt</a>
-        <a href="{{ url_for('transactions.create', kind='income') }}" class="btn-ghost btn-sm">{{ m.icon("plus", 16) }} Income</a>
-        <a href="{{ url_for('transactions.create') }}" class="btn-primary btn-sm">{{ m.icon("plus", 16) }} Expense</a>
+        <a href="{{ url_for('transactions.create', kind='income') }}" class="btn-ghost btn-sm">+ Credit</a>
+        <a href="{{ url_for('transactions.create') }}" class="btn-primary btn-sm">− Debit</a>
     </div>
 </header>
 
@@ -32,8 +32,13 @@
 
 <section class="stat-grid" aria-label="This month">
     {% set change = ((this_month.expense - last_month.expense) / last_month.expense * 100) if last_month.expense else None %}
-    <div class="stat-card">
-        <span class="stat-label">Spent this month</span>
+    <div class="stat-card is-credit">
+        <span class="stat-label"><span class="sign credit" aria-hidden="true">+</span>Credit this month</span>
+        <span class="stat-value">{{ this_month.income|money }}</span>
+        <span class="stat-delta muted">Last month {{ last_month.income|money }}</span>
+    </div>
+    <div class="stat-card is-debit">
+        <span class="stat-label"><span class="sign debit" aria-hidden="true">−</span>Debit this month</span>
         <span class="stat-value">{{ this_month.expense|money }}</span>
         {% if change is not none %}
         <span class="stat-delta {{ 'delta-bad' if change > 0 else 'delta-good' }}">
@@ -42,19 +47,14 @@
         {% else %}<span class="stat-delta muted">No data for last month</span>{% endif %}
     </div>
     <div class="stat-card">
-        <span class="stat-label">Income this month</span>
-        <span class="stat-value">{{ this_month.income|money }}</span>
-        <span class="stat-delta muted">Last month {{ last_month.income|money }}</span>
+        <span class="stat-label">Net</span>
+        <span class="stat-value {{ 'text-bad' if this_month.net < 0 }}">{{ "+" if this_month.net > 0 }}{{ this_month.net|money }}</span>
+        <span class="stat-delta muted">Credit minus debit</span>
     </div>
     <div class="stat-card">
-        <span class="stat-label">Net saved</span>
-        <span class="stat-value {{ 'text-bad' if this_month.net < 0 }}">{{ this_month.net|money }}</span>
-        <span class="stat-delta muted">Income minus expenses</span>
-    </div>
-    <div class="stat-card">
-        <span class="stat-label">Savings rate</span>
-        <span class="stat-value">{{ (this_month.savings_rate|round|int ~ "%") if this_month.savings_rate is not none else "—" }}</span>
-        <span class="stat-delta muted">Target: 20% or more</span>
+        <span class="stat-label">Debit last month</span>
+        <span class="stat-value">{{ last_month.expense|money }}</span>
+        <span class="stat-delta muted">{{ this_month.expense_count }} debit{{ "s" if this_month.expense_count != 1 }} so far this month</span>
     </div>
 </section>
 
@@ -79,17 +79,17 @@
     </section>
     <section class="card">
         <div class="card-head">
-            <h2 class="card-title">Income vs expenses</h2>
+            <h2 class="card-title">Credit vs debit</h2>
             <span class="muted small">Last 6 months</span>
         </div>
-        <div class="chart-box"><canvas id="trend-chart" aria-label="Monthly income and expenses for the last six months" role="img"></canvas></div>
+        <div class="chart-box"><canvas id="trend-chart" aria-label="Monthly credit and debit for the last six months" role="img"></canvas></div>
     </section>
 </div>
 
 <div class="grid-2">
     <section class="card">
         <div class="card-head">
-            <h2 class="card-title">Where it went</h2>
+            <h2 class="card-title">Where the debits went</h2>
             <a href="{{ url_for('analytics.index') }}" class="link small">Full analysis →</a>
         </div>
         {% if categories %}
@@ -101,7 +101,7 @@
             </li>
             {% endfor %}
         </ul>
-        {% else %}<p class="empty">No expenses yet this month.</p>{% endif %}
+        {% else %}<p class="empty">No debits yet this month.</p>{% endif %}
     </section>
 
     <section class="card">

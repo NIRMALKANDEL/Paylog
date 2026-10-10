@@ -1,73 +1,157 @@
 {% extends "base.html" %}
 
-{% block title %}Paylog — Track Every Rupee{% endblock %}
+{% block title %}Paylog — Know where your money goes{% endblock %}
 
 {% block public_content %}
 
 <section class="hero">
     <div class="hero-inner">
-        <div class="hero-badge">Personal Finance Tracker</div>
-        <h1 class="hero-title">
-            Know where your<br>
-            <em>money goes</em>
-        </h1>
+        <a class="hero-badge" href="https://github.com/NIRMALKANDEL/Paylog/releases/latest">
+            <b>New</b> Scan a GPay or PhonePe screenshot, Paylog fills it in {{ m.icon("chevron-right", 14) }}
+        </a>
+        <h1 class="hero-title">Know where your <em>money goes</em></h1>
         <p class="hero-subtitle">
-            Log expenses and income, set budgets that warn you before you overspend,
-            see a year of patterns at a glance, and plan the savings goals that matter.
+            Record a payment in seconds, see every month's − debits and + credits at a glance,
+            and get a gentle nudge before you overspend. Free, private, on the web and Android.
         </p>
         <div class="hero-actions">
-            <a href="{{ url_for('auth.register') }}" class="btn-primary">Start tracking free</a>
-            <a href="{{ url_for('auth.login') }}" class="btn-ghost">Sign in</a>
+            <a href="{{ url_for('auth.register') }}" class="btn-primary">Start tracking free {{ m.icon("chevron-right", 16) }}</a>
+            <a href="https://github.com/NIRMALKANDEL/Paylog/releases/latest" class="btn-ghost">{{ m.icon("download", 16) }} Get the Android app</a>
         </div>
-        <p class="hero-note">Free, private, and you stay signed in for 30 days on your phone.</p>
+        <p class="hero-note">No card needed. Already have an account? <a class="link" href="{{ url_for('auth.login') }}">Sign in</a></p>
     </div>
+
+    {# A static preview of the dashboard (decorative: the real numbers are yours after signing up). #}
     <div class="hero-visual" aria-hidden="true">
-        <div class="mock-card">
-            <div class="mock-card-header">
-                <span class="mock-label">This month</span>
-                <span class="mock-total">₹12,450</span>
-            </div>
-            <div class="mock-bars">
-                {% for cat, width, amt in [("Bills", 72, "₹4,500"), ("Food", 52, "₹3,200"), ("Health", 33, "₹2,050"), ("Transport", 28, "₹1,800")] %}
-                <div class="mock-bar-row">
-                    <span class="mock-cat">{{ cat }}</span>
-                    <div class="mock-bar-track"><div class="mock-bar" style="width: {{ width }}%"></div></div>
-                    <span class="mock-amt">{{ amt }}</span>
+        <div class="preview-frame">
+            <div class="preview-bar"><span></span><span></span><span></span></div>
+            <div class="preview">
+                <div class="mock-card span-4">
+                    <div class="mock-card-header"><span class="mock-label">+ Credit · October</span></div>
+                    <div class="mock-total credit">₹68,500</div>
+                    <div class="mock-sub">Salary, refunds, money received</div>
                 </div>
-                {% endfor %}
-            </div>
-            <div class="mock-foot">
-                <span class="mock-pill status-good">{{ m.icon("check", 14) }} 72% of budget used</span>
-                <span class="mock-pill">Saved 28%</span>
+                <div class="mock-card span-4">
+                    <div class="mock-card-header"><span class="mock-label">− Debit · October</span></div>
+                    <div class="mock-total debit">₹24,180</div>
+                    <div class="mock-sub">12% less than September</div>
+                </div>
+                <div class="mock-card span-4 hide-mobile">
+                    <div class="mock-card-header"><span class="mock-label">Spending pace</span></div>
+                    <svg class="mock-spark" viewBox="0 0 200 70" preserveAspectRatio="none">
+                        <defs><linearGradient id="spark-fill" x1="0" x2="0" y1="0" y2="1">
+                            <stop offset="0" stop-color="var(--accent-fill)" stop-opacity="0.35"/><stop offset="1" stop-color="var(--accent-fill)" stop-opacity="0"/>
+                        </linearGradient></defs>
+                        <path d="M0 62 L20 58 L40 55 L60 47 L80 44 L100 36 L120 33 L140 25 L160 22 L180 14 L200 10 L200 70 L0 70 Z" fill="url(#spark-fill)"/>
+                        <path d="M0 62 L20 58 L40 55 L60 47 L80 44 L100 36 L120 33 L140 25 L160 22 L180 14 L200 10" fill="none" stroke="var(--accent-fill)" stroke-width="2.5" stroke-linecap="round"/>
+                        <path d="M0 64 L40 60 L80 52 L120 46 L160 36 L200 28" fill="none" stroke="var(--ink-faint)" stroke-width="1.5" stroke-dasharray="4 4"/>
+                    </svg>
+                </div>
+                <div class="mock-card span-7">
+                    <div class="mock-card-header"><span class="mock-label">Where the debits went</span><span class="mock-pill status-good">{{ m.icon("check", 12) }} 72% of budget</span></div>
+                    <div class="mock-bars">
+                        {% for cat, width, amt in [("Rent", 100, "₹12,000"), ("Food", 44, "₹5,320"), ("Bills", 26, "₹3,150"), ("Transport", 17, "₹2,010"), ("Shopping", 14, "₹1,700")] %}
+                        <div class="mock-bar-row">
+                            <span class="mock-cat">{{ cat }}</span>
+                            <div class="mock-bar-track"><div class="mock-bar" style="width: {{ width }}%"></div></div>
+                            <span class="mock-amt">{{ amt }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="mock-card span-5">
+                    <div class="mock-card-header"><span class="mock-label">Recent</span></div>
+                    <div class="mock-tx">
+                        <div><i>S</i><span>Swiggy · Food</span><b>−₹349</b></div>
+                        <div><i class="in">R</i><span>Rahul · received</span><b class="in">+₹1,200</b></div>
+                        <div><i>U</i><span>Uber · Transport</span><b>−₹212</b></div>
+                        <div><i>B</i><span>Blinkit · Groceries</span><b>−₹1,284</b></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </section>
 
-<section class="features">
-    <div class="features-inner">
-        {% for ico, title, body in [
-            ("list", "Log in seconds", "Expenses and income with categories, notes, search, filters and CSV import/export."),
-            ("chart", "Analyse your past", "Monthly trends, category breakdowns, weekday habits and plain-language insights."),
-            ("wallet", "Budgets that nudge", "Set an overall or per-category budget and see progress bars before you overshoot."),
-            ("target", "Savings goals", "Track progress toward goals and see exactly how much to set aside each month."),
-            ("repeat", "Recurring payments", "Rent, salary and subscriptions are logged automatically on schedule."),
-            ("calc", "Planning calculators", "Compound growth, goal planner, time-to-goal, emergency fund and loan EMI."),
-        ] %}
-        <div class="feature-card">
-            <div class="feature-icon">{{ m.icon(ico, 22) }}</div>
-            <h3 class="feature-title">{{ title }}</h3>
-            <p class="feature-body">{{ body }}</p>
-        </div>
-        {% endfor %}
+<div class="trust reveal">
+    <p>Reads payment screenshots from</p>
+    <div class="trust-row"><span>Google Pay</span><span>PhonePe</span><span>Paytm</span><span>BHIM</span><span>Bank SMS</span><span>Shop bills</span></div>
+</div>
+
+<section class="section" aria-labelledby="features-title">
+    <div class="section-head reveal">
+        <span class="section-eyebrow">Everything you need, nothing you don't</span>
+        <h2 class="section-title" id="features-title">A money diary that fills itself in</h2>
+        <p class="section-lead">Built for everyday UPI life: quick to record, honest about what it read, and clear about where the month went.</p>
     </div>
+
+    <div class="bento">
+        <article class="bento-card wide reveal">
+            <div class="feature-icon">{{ m.icon("scan", 22) }}</div>
+            <h3 class="feature-title">Scan a screenshot, check, save</h3>
+            <p class="feature-body">Share a GPay, PhonePe or Paytm screenshot to Paylog. The amount, who it was with, the date and the UPI reference are filled in. Nothing is saved until you say so, and already-saved payments are flagged.</p>
+            <div class="bento-visual scan-sample">
+                <div class="scan-phone">Paid to<strong>₹349</strong>Swiggy<br>24 Sep · 8:41 pm</div>
+                <div class="scan-fields">
+                    <div><span>Amount</span><b>−₹349</b></div>
+                    <div><span>To</span><b>Swiggy</b></div>
+                    <div><span>UPI ref</span><b>4267…5678</b></div>
+                </div>
+            </div>
+        </article>
+
+        <article class="bento-card reveal">
+            <div class="feature-icon">{{ m.icon("plus", 22) }}</div>
+            <h3 class="feature-title">− Debit, + Credit</h3>
+            <p class="feature-body">Every entry carries a clear direction, so a friend paying you back never counts as salary.</p>
+            <div class="bento-visual flags"><span class="flag debit">− ₹250 lunch</span><span class="flag credit">+ ₹1,200 Rahul</span></div>
+        </article>
+
+        <article class="bento-card reveal">
+            <div class="feature-icon">{{ m.icon("wallet", 22) }}</div>
+            <h3 class="feature-title">Budgets that nudge</h3>
+            <p class="feature-body">An overall or per-category limit, with a warning before you go over, not after.</p>
+            <div class="bento-visual"><div class="progress"><div class="progress-bar status-good" style="width: 72%"></div></div><p class="muted small" style="margin-top:.5rem">₹7,000 left of ₹25,000</p></div>
+        </article>
+
+        <article class="bento-card reveal">
+            <div class="feature-icon">{{ m.icon("edit", 22) }}</div>
+            <h3 class="feature-title">Type it like a note</h3>
+            <p class="feature-body"><code>250 lunch</code>, <code>2k rent yesterday</code>, <code>+1200 from Rahul</code>. One line, saved.</p>
+            <div class="bento-visual"><span class="big-stat">3<small> sec</small></span></div>
+        </article>
+
+        <article class="bento-card half reveal">
+            <div class="feature-icon">{{ m.icon("chart", 22) }}</div>
+            <h3 class="feature-title">See your patterns</h3>
+            <p class="feature-body">Monthly trends, category breakdowns, weekday habits and plain-language insights.</p>
+        </article>
+
+        <article class="bento-card half reveal">
+            <div class="feature-icon">{{ m.icon("target", 22) }}</div>
+            <h3 class="feature-title">Goals, recurring, calculators</h3>
+            <p class="feature-body">Savings goals with a monthly target, rent and subscriptions on schedule, EMI and growth calculators.</p>
+        </article>
+    </div>
+</section>
+
+<section class="section" aria-labelledby="how-title">
+    <div class="section-head reveal">
+        <span class="section-eyebrow">How it works</span>
+        <h2 class="section-title" id="how-title">Set up in a minute</h2>
+    </div>
+    <ol class="how">
+        <li class="reveal"><h3>Create a free account</h3><p>On the web, or install the Android app and add the home-screen widget.</p></li>
+        <li class="reveal"><h3>Record as you go</h3><p>Type a quick note, or share a payment screenshot and tap Save.</p></li>
+        <li class="reveal"><h3>Check your month</h3><p>Credit and debit totals, where it went, and how you're pacing against your budget.</p></li>
+    </ol>
 </section>
 
 <section class="cta-section">
-    <div class="cta-inner">
-        <h2 class="cta-title">Ready to take control?</h2>
-        <p class="cta-body">Free, private and works beautifully on your phone. Pick a theme that feels like yours.</p>
-        <a href="{{ url_for('auth.register') }}" class="btn-primary">Create free account</a>
+    <div class="cta-inner reveal">
+        <h2 class="cta-title">Ready to know where it goes?</h2>
+        <p class="cta-body">Free and private. Your data stays yours: export it any time, delete it any time.</p>
+        <a href="{{ url_for('auth.register') }}" class="btn-primary">Create free account {{ m.icon("chevron-right", 16) }}</a>
     </div>
 </section>
 

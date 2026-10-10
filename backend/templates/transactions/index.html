@@ -31,8 +31,8 @@
             <label for="kind">Type</label>
             <select id="kind" name="kind" class="form-input">
                 <option value="">All</option>
-                <option value="expense" {% if filters.kind == 'expense' %}selected{% endif %}>Expenses</option>
-                <option value="income" {% if filters.kind == 'income' %}selected{% endif %}>Income</option>
+                <option value="expense" {% if filters.kind == 'expense' %}selected{% endif %}>− Debit</option>
+                <option value="income" {% if filters.kind == 'income' %}selected{% endif %}>+ Credit</option>
             </select>
         </div>
         <div class="form-group">
@@ -67,8 +67,8 @@
 
 <section class="summary-strip">
     <div><span class="muted small">Transactions</span><strong>{{ summary.count }}</strong></div>
-    <div><span class="muted small">Income</span><strong class="amount-income">{{ summary.income|money }}</strong></div>
-    <div><span class="muted small">Expenses</span><strong class="amount-expense">{{ summary.expense|money }}</strong></div>
+    <div><span class="muted small">+ Credit</span><strong class="amount-income">{{ summary.income|money }}</strong></div>
+    <div><span class="muted small">− Debit</span><strong class="amount-expense">{{ summary.expense|money }}</strong></div>
     <div><span class="muted small">Net</span><strong>{{ (summary.income - summary.expense)|money }}</strong></div>
 </section>
 

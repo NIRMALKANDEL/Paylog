@@ -41,6 +41,8 @@
         return {
             s1: cssColor("--series-1"),
             s2: cssColor("--series-2"),
+            credit: cssColor("--credit"),
+            debit: cssColor("--debit"),
             accent: cssColor("--accent-fill"),
             ink: cssColor("--ink"),
             muted: cssColor("--ink-muted"),
@@ -159,7 +161,7 @@
                 type: "bar",
                 data: {
                     labels: monthly.labels,
-                    datasets: [barDataset("Income", monthly.income, p.s1, p), barDataset("Expenses", monthly.expense, p.s2, p)]
+                    datasets: [barDataset("Credit", monthly.income, p.credit, p), barDataset("Debit", monthly.expense, p.debit, p)]
                 },
                 options: {
                     interaction: { mode: "index", intersect: false },

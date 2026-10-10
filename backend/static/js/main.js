@@ -264,7 +264,7 @@
             preview.classList.toggle("quick-error", !data.ok);
             if (!data.ok) { preview.textContent = data.error; return; }
             var when = data.when || data.date;
-            preview.textContent = (data.kind === "income" ? "Income " : "Expense ") + data.amount + " · " + data.category +
+            preview.textContent = (data.kind === "income" ? "+ Credit " : "− Debit ") + data.amount + " · " + data.category +
                 (data.description ? " · " + data.description : "") + " · " + when + "  ↵ to save";
         }
 
@@ -280,5 +280,27 @@
                     .catch(function () { /* preview is optional */ });
             }, 200);
         });
+    });
+})();
+
+// Landing page: fade sections in as they scroll into view (CSS keeps them visible without JS).
+(function () {
+    var items = document.querySelectorAll(".reveal");
+    if (!items.length) return;
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || !("IntersectionObserver" in window)) {
+        items.forEach(function (el) { el.classList.add("in-view"); });
+        return;
+    }
+    var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add("in-view");
+            observer.unobserve(entry.target);
+        });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.08 });
+    items.forEach(function (el, i) {
+        el.style.transitionDelay = Math.min(i % 4, 3) * 70 + "ms";
+        observer.observe(el);
     });
 })();
