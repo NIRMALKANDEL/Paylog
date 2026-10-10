@@ -317,57 +317,42 @@ def test_ai_output_is_revalidated(app):
 
 
 # ------------------------------------------------------------------ #
-# Auto-save + undo                                                    #
+# Always reviewed, never saved automatically                          #
 # ------------------------------------------------------------------ #
 
-def test_clear_receipt_is_auto_saved_with_undo(app, auth_client):
+def test_clear_receipt_is_shown_for_review_not_saved(app, auth_client):
     resp = auth_client.post("/receipts/review", {"mode": "ocr", "text": GPAY_TEXT})
-    assert resp.status_code == 302 and resp.location.endswith("/dashboard")
-    row = saved(app)[0]
-    assert (row["amount_cents"], row["description"], row["reference"]) == (25000, "Swiggy", "425612345678")
-    dash = auth_client.get("/dashboard").get_data(as_text=True)
-    assert "Saved ₹250 · Swiggy · Food" in dash and ">Undo<" in dash
-    assert "Saved ₹250" not in auth_client.get("/dashboard").get_data(as_text=True)  # shown once
-
-
-def test_undo_removes_the_auto_saved_transaction(app, auth_client):
-    auth_client.post("/receipts/review", {"mode": "ocr", "text": GPAY_TEXT})
-    tx_id = saved(app)[0]["id"]
-    resp = auth_client.post(f"/transactions/{tx_id}/delete", {"undo": "1", "next": "/dashboard"})
-    assert resp.location.endswith("/dashboard")
+    assert resp.status_code == 200 and b"Check and save" in resp.data
     assert saved(app) == []
-    assert b"Undone" in auth_client.get("/dashboard").data
+
+
+def test_old_auto_save_setting_is_ignored(app, auth_client):
+    with app.app_context():
+        get_db().execute("UPDATE users SET auto_save_receipts = 1")
+        get_db().commit()
+    assert auth_client.post("/receipts/review", {"mode": "ocr", "text": GPAY_TEXT}).status_code == 200
+    assert saved(app) == []
 
 
 def test_unclear_receipt_still_shows_form(app, auth_client):
-    # Amount without a rupee sign and no corroboration -> not confident.
     resp = auth_client.post("/receipts/review", {"mode": "ocr", "text": "Paid to Ramesh\n85\nPayment successful"})
     assert resp.status_code == 200 and b"Check and save" in resp.data
     assert saved(app) == []
 
 
-def test_possible_duplicate_is_never_auto_saved(app, auth_client):
-    auth_client.post("/receipts/review", {"mode": "ocr", "text": GPAY_TEXT})
+def test_receipt_already_saved_is_flagged(app, auth_client):
+    save_from_receipt(auth_client)
     resp = auth_client.post("/receipts/review", {"mode": "ocr", "text": GPAY_TEXT})
     assert resp.status_code == 200 and b"already saved this payment" in resp.data
     assert len(saved(app)) == 1
 
 
-def test_auto_save_can_be_turned_off(app, auth_client):
-    auth_client.post("/settings/receipts", {})
-    resp = auth_client.post("/receipts/review", {"mode": "ocr", "text": GPAY_TEXT})
-    assert resp.status_code == 200
-    assert saved(app) == []
-    auth_client.post("/settings/receipts", {"auto_save_receipts": "1"})
-    assert auth_client.post("/receipts/review", {"mode": "ocr", "text": GPAY_TEXT}).status_code == 302
-
-
-def test_ai_read_receipt_is_auto_saved(app, auth_client, monkeypatch):
+def test_ai_read_receipt_is_shown_for_review(app, auth_client, monkeypatch):
     enable_ai(app, monkeypatch, FakeClient(AI_REPLY))
     resp = auth_client.post("/receipts/review", {"mode": "ai", "image": (io.BytesIO(JPEG_BYTES), "r.jpg")},
                             content_type="multipart/form-data")
-    assert resp.status_code == 302
-    assert saved(app)[0]["amount_cents"] == 48000
+    assert resp.status_code == 200 and b"480" in resp.data
+    assert saved(app) == []
 
 
 # ------------------------------------------------------------------ #

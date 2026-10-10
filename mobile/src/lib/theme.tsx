@@ -31,6 +31,15 @@ const light = {
   income: '#2a78d6',
   expense: '#eb6834',
   paper: '#fbf8f1',
+  // Money direction: + credit (in), − debit (out).
+  credit: '#0f7a2e',
+  debit: '#c2410c',
+  // Glass: translucent surfaces over the soft colour backdrop (components/Backdrop).
+  glass: 'rgba(255,255,255,0.62)',
+  glassStrong: 'rgba(255,255,255,0.82)',
+  glassBorder: 'rgba(255,255,255,0.9)',
+  glassEdge: 'rgba(20,20,19,0.07)',
+  shadow: 'rgba(30,40,38,0.10)',
 };
 
 const dark: typeof light = {
@@ -51,6 +60,13 @@ const dark: typeof light = {
   income: '#3987e5',
   expense: '#e0713f',
   paper: '#232422',
+  credit: '#4cc26a',
+  debit: '#f08a5d',
+  glass: 'rgba(36,38,36,0.58)',
+  glassStrong: 'rgba(40,42,40,0.82)',
+  glassBorder: 'rgba(255,255,255,0.10)',
+  glassEdge: 'rgba(255,255,255,0.05)',
+  shadow: 'rgba(0,0,0,0.35)',
 };
 
 function mix(hex: string, other: string, amount: number) {

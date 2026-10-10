@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     description  TEXT    NOT NULL DEFAULT '',
     recurring_id INTEGER REFERENCES recurring(id) ON DELETE SET NULL,
     reference    TEXT,
+    time         TEXT,
+    method       TEXT,
     created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions (user_id, date);
@@ -112,7 +114,9 @@ MIGRATIONS = [
     ("users", "email_verified", "INTEGER NOT NULL DEFAULT 0"),
     ("users", "verification_sent_at", "TEXT"),
     ("transactions", "reference", "TEXT"),  # UPI transaction ID, used to spot duplicate receipts
-    ("users", "auto_save_receipts", "INTEGER NOT NULL DEFAULT 1"),
+    ("users", "auto_save_receipts", "INTEGER NOT NULL DEFAULT 1"),  # no longer used: scans are always reviewed
+    ("transactions", "time", "TEXT"),    # HH:MM, optional (read from payment screenshots)
+    ("transactions", "method", "TEXT"),  # payment app or method: Google Pay, Cash, Card... optional
 ]
 
 

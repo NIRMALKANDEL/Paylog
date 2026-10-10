@@ -19,6 +19,7 @@ bp = Blueprint("transactions", __name__, url_prefix="/transactions")
 
 PER_PAGE = 20
 MAX_DESCRIPTION = 200
+MAX_METHOD = 30
 MAX_IMPORT_ROWS = 5000
 SORTS = {
     "date_desc": "date DESC, id DESC",
@@ -50,6 +51,12 @@ def validate_transaction(data):
     description = (data.get("description") or "").strip()
     if len(description) > MAX_DESCRIPTION:
         return None, f"Description must be at most {MAX_DESCRIPTION} characters."
+    time = (data.get("time") or "").strip()
+    if time and not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", time):
+        return None, "Time must look like 14:30."
+    method = re.sub(r"\s+", " ", data.get("method") or "").strip()
+    if len(method) > MAX_METHOD:
+        return None, f"Payment method must be at most {MAX_METHOD} characters."
     return {
         "kind": kind,
         "amount_cents": amount,
@@ -58,6 +65,8 @@ def validate_transaction(data):
         "description": description,
         # UPI transaction ID from a scanned receipt; letters and digits only.
         "reference": re.sub(r"[^A-Za-z0-9]", "", data.get("reference") or "")[:40] or None,
+        "time": time or None,
+        "method": method or None,
     }, None
 
 
@@ -65,10 +74,10 @@ def insert_transaction(user_id, clean):
     """Save a validated transaction and return its id."""
     db = get_db()
     cur = db.execute(
-        "INSERT INTO transactions (user_id, kind, amount_cents, category, date, description, reference)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO transactions (user_id, kind, amount_cents, category, date, description, reference, time, method)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (user_id, clean["kind"], clean["amount_cents"], clean["category"], clean["date"],
-         clean["description"], clean.get("reference")),
+         clean["description"], clean.get("reference"), clean.get("time"), clean.get("method")),
     )
     db.commit()
     return cur.lastrowid
@@ -89,6 +98,15 @@ def find_duplicate(user_id, reference):
         "SELECT id, date, amount_cents, description, category FROM transactions"
         " WHERE user_id = ? AND reference = ? ORDER BY id LIMIT 1",
         (user_id, reference),
+    ).fetchone()
+
+
+def find_similar(user_id, kind, amount_cents, day):
+    """A transaction with the same direction, amount and date: maybe this payment, saved before."""
+    return get_db().execute(
+        "SELECT id, date, amount_cents, description, category FROM transactions"
+        " WHERE user_id = ? AND kind = ? AND amount_cents = ? AND date = ? ORDER BY id LIMIT 1",
+        (user_id, kind, amount_cents, day),
     ).fetchone()
 
 
@@ -124,8 +142,9 @@ def build_where(filters):
         params.append(filters["category"])
     if filters["q"]:
         escaped = filters["q"].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        clauses.append("(description LIKE ? ESCAPE '\\' OR category LIKE ? ESCAPE '\\')")
-        params += [f"%{escaped}%"] * 2
+        clauses.append("(description LIKE ? ESCAPE '\\' OR category LIKE ? ESCAPE '\\'"
+                       " OR method LIKE ? ESCAPE '\\' OR reference LIKE ? ESCAPE '\\')")
+        params += [f"%{escaped}%"] * 4
     if filters["start"]:
         clauses.append("date >= ?")
         params.append(filters["start"].isoformat())
@@ -358,10 +377,10 @@ def save_import(user_id, clean_rows):
 # Quick add                                                           #
 # ------------------------------------------------------------------ #
 
-def quick_parse(text, written_on=None):
+def quick_parse(text, written_on=None, kind=None, category=None):
     """`written_on` anchors "yesterday"/"monday" to the day a note was typed
     (an offline widget note can reach the server a day or two later)."""
-    fields, error = parse_quick(text, written_on or today())
+    fields, error = parse_quick(text, written_on or today(), kind, category)
     if error:
         return None, error
     return validate_transaction(fields)

@@ -315,19 +315,92 @@ UPI transaction ID 612345678901
 Google Pay"""
 
 
-def test_clear_receipt_is_saved_automatically(api):
+def test_receipt_is_returned_for_review_never_saved(api):
     resp = api.post("/receipts/parse", {"text": RECEIPT})
-    assert resp.json["saved"]["amount_cents"] == 34900
-    assert resp.json["saved"]["category"] == "Food"
-    again = api.post("/receipts/parse", {"text": RECEIPT})
-    assert again.json["saved"] is None and again.json["duplicate"]
-
-
-def test_receipt_review_when_auto_save_is_off(api):
-    api.patch("/me", {"auto_save_receipts": False})
-    resp = api.post("/receipts/parse", {"text": RECEIPT})
-    assert resp.json["saved"] is None and resp.json["form"]["amount"] == "349"
+    assert resp.json["form"]["amount"] == "349" and resp.json["form"]["category"] == "Food"
+    assert "saved" not in resp.json
+    assert api.get("/transactions").json["items"] == []
     assert api.post("/receipts/parse", {"text": ""}).status_code == 422
+
+
+def test_receipt_lines_with_heights_and_warnings(api):
+    lines = [{"text": "Payment to you", "height": 40}, {"text": "210,000", "height": 75},
+             {"text": "Paid - 9 May", "height": 38}]
+    data = api.post("/receipts/parse", {"lines": lines}).json
+    assert data["form"]["kind"] == "income" and data["form"]["amount"] == "10000"
+    assert "amount" in data["warnings"] and "direction" not in data["warnings"]
+
+
+def test_receipt_duplicate_and_similar(api):
+    api.post("/transactions", {**api.post("/receipts/parse", {"text": RECEIPT}).json["form"]})
+    assert api.post("/receipts/parse", {"text": RECEIPT}).json["duplicate"]
+    no_ref = "Paid to Swiggy\n₹349\n12 Sep 2026"
+    data = api.post("/receipts/parse", {"text": no_ref}).json
+    assert data["duplicate"] is None and data["similar"]["amount_cents"] == 34900
+
+
+def test_online_reader_is_off_without_a_key(api):
+    import io as _io
+    resp = api.http.post("/api/v1/receipts/parse", headers=api._headers(), content_type="multipart/form-data",
+                           data={"image": (_io.BytesIO(b"\xff\xd8\xff\xe0" + b"\0" * 64), "r.jpg")})
+    assert resp.status_code == 503 and "enter the details yourself" in resp.json["error"]
+    assert api.get("/meta").json["online_reader"] is False
+
+
+def test_online_reader_uses_ocr_space(api, monkeypatch):
+    import io as _io
+    import json as _json
+
+    from services import receipt_ocr
+
+    api.app.config["OCR_SPACE_API_KEY"] = "test-key"
+    reply = {"ParsedResults": [{"TextOverlay": {"Lines": [
+        {"LineText": "Paid to Zomato", "MaxHeight": 20, "MinTop": 100},
+        {"LineText": "₹480", "MaxHeight": 60, "MinTop": 40},
+        {"LineText": "12 Sep 2026, 8:41 pm", "MaxHeight": 18, "MinTop": 140},
+    ]}}]}
+    sent = {}
+
+    class Response(_io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def fake_urlopen(request, timeout):
+        sent["body"] = request.data
+        return Response(_json.dumps(reply).encode())
+
+    monkeypatch.setattr(receipt_ocr.urllib.request, "urlopen", fake_urlopen)
+    resp = api.http.post("/api/v1/receipts/parse", headers=api._headers(), content_type="multipart/form-data",
+                           data={"image": (_io.BytesIO(b"\xff\xd8\xff\xe0" + b"\0" * 64), "r.jpg")})
+    form = resp.json["form"]
+    assert (form["amount"], form["description"], form["date"], form["time"]) == ("480", "Zomato", "2026-09-12", "20:41")
+    assert b"apikey=test-key" in sent["body"]
+
+
+def test_transaction_time_and_method(api):
+    tx = api.post("/transactions", {"kind": "expense", "amount": "50", "category": "Food", "date": "2026-09-10",
+                                    "time": "09:30", "method": "Google Pay"}).json["transaction"]
+    assert (tx["time"], tx["method"]) == ("09:30", "Google Pay")
+    # An update without these fields (older app) keeps them.
+    tx = api.put(f"/transactions/{tx['id']}", {"kind": "expense", "amount": "60", "category": "Food",
+                                               "date": "2026-09-10"}).json["transaction"]
+    assert (tx["amount_cents"], tx["time"], tx["method"]) == (6000, "09:30", "Google Pay")
+    assert api.get("/transactions?q=google").json["items"][0]["id"] == tx["id"]
+    bad = api.post("/transactions", {"kind": "expense", "amount": "5", "category": "Food", "date": "2026-09-10",
+                                     "time": "25:99"})
+    assert bad.status_code == 400
+
+
+def test_dashboard_for_an_earlier_month(api):
+    api.add(amount="300", date="2026-08-20")
+    api.add(amount="100", date="2026-09-02")
+    data = api.get("/dashboard?month=2026-08").json
+    assert data["month"] == "2026-08" and not data["is_current"] and data["next_month"] == "2026-09"
+    assert data["this_month"]["expense"] == 30000 and len(data["recent"]) == 1
+    assert api.get("/dashboard?month=2030-01").json["is_current"]  # the future clamps to now
 
 
 # ------------------------------------------------------------------ #

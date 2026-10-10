@@ -8,13 +8,13 @@ import { BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, Tex
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/Icon';
-import { Button, Muted, Notice, Row } from '@/components/ui';
+import { Button, Chip, Muted, Notice, Row } from '@/components/ui';
 import { api, errorMessage } from '@/lib/api';
 import { useUser } from '@/lib/auth';
 import { toISO } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import { useTheme } from '@/lib/theme';
-import type { QuickPreview, Transaction } from '@/lib/types';
+import type { Kind, QuickPreview, Transaction } from '@/lib/types';
 import { refreshWidgets, updateWidgets } from '@/lib/widget';
 
 const MAX_LINES = 10;
@@ -36,6 +36,8 @@ export default function Quick() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<Transaction[] | null>(null);
+  // − / + switch: null lets the words decide ("salary 65000" is a credit).
+  const [kind, setKind] = useState<Kind | null>(null);
 
   const lines = linesOf(text);
 
@@ -46,7 +48,7 @@ export default function Quick() {
     const timer = setTimeout(async () => {
       const results = await Promise.all(pending.map(async (line) => {
         try {
-          return [line, await api<QuickPreview>(`/transactions/quick/preview?q=${encodeURIComponent(line)}`)] as const;
+          return [line, await api<QuickPreview>(`/transactions/quick/preview?q=${encodeURIComponent(line)}${kind ? `&kind=${kind}` : ''}`)] as const;
         } catch (err) {
           return [line, { ok: false, error: errorMessage(err) }] as const;
         }
@@ -54,7 +56,7 @@ export default function Quick() {
       setPreviews((prev) => ({ ...prev, ...Object.fromEntries(results) }));
     }, 350);
     return () => clearTimeout(timer);
-  }, [lines.join('\n')]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [lines.join('\n'), kind]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Android can open this screen before the keyboard is ready; focus again shortly after.
   useEffect(() => {
@@ -88,7 +90,7 @@ export default function Quick() {
     try {
       for (const line of lines) {
         // The phone's date, so "today" is right even when the server's clock (UTC) is still on yesterday.
-        const res = await api<{ transaction: Transaction }>('/transactions/quick', { body: { q: line, written_on: toISO(new Date()) } });
+        const res = await api<{ transaction: Transaction }>('/transactions/quick', { body: { q: line, written_on: toISO(new Date()), kind } });
         done.push(res.transaction);
       }
       const last = done[done.length - 1];
@@ -142,6 +144,14 @@ export default function Quick() {
           </View>
         ) : null}
 
+        <Row>
+          {(['expense', 'income'] as Kind[]).map((k) => (
+            <Chip key={k} label={k === 'income' ? '+  Credit' : '−  Debit'} active={kind === k}
+              onPress={() => { setKind(kind === k ? null : k); setPreviews({}); }} />
+          ))}
+          <Muted>{kind ? 'Tap again for auto' : 'Auto from your words'}</Muted>
+        </Row>
+
         <TextInput
           ref={inputRef}
           value={text}
@@ -151,7 +161,7 @@ export default function Quick() {
           }}
           autoFocus
           multiline
-          placeholder={'What did you spend?\n250 lunch'}
+          placeholder={'250 lunch\n+1200 from Rahul'}
           placeholderTextColor={colors.faint}
           accessibilityLabel="Quick entry. One transaction per line."
           style={{ fontSize: 22, lineHeight: 34, color: colors.ink, minHeight: 150, textAlignVertical: 'top', padding: 0 }}
@@ -165,7 +175,7 @@ export default function Quick() {
                 <Icon name={p && !p.ok ? 'alert' : 'check'} size={15} color={p ? (p.ok ? colors.good : colors.warning) : colors.faint} />
                 <Text style={{ color: p && !p.ok ? colors.warning : colors.inkSoft, flex: 1, fontSize: 14 }} numberOfLines={2}>
                   {!p ? `${line} …`
-                    : p.ok ? `${p.kind === 'income' ? 'Income' : 'Expense'} ${p.amount} · ${p.category}${p.description ? ` · ${p.description}` : ''} · ${p.when}`
+                    : p.ok ? `${p.kind === 'income' ? '+ Credit' : '− Debit'} ${p.amount} · ${p.category}${p.description ? ` · ${p.description}` : ''} · ${p.when}`
                     : p.error}
                 </Text>
               </Row>
@@ -192,7 +202,7 @@ export default function Quick() {
                 </Pressable>
               ))}
             </Row>
-            <Muted>Start with + for income (“+500 refund”). Add “yesterday”, “monday” or “12 sep” for another day.</Muted>
+            <Muted>Start with + for money received (“+500 refund”), or use the switch above. Add “yesterday”, “monday” or “12 sep” for another day.</Muted>
           </View>
         ) : null}
       </ScrollView>

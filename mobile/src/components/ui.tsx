@@ -1,31 +1,60 @@
-import { forwardRef, type ReactNode } from 'react';
+import { forwardRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text,
   TextInput, View, type StyleProp, type TextInputProps, type TextStyle, type ViewStyle,
 } from 'react-native';
+import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Rect } from 'react-native-svg';
 
 import { friendlyDate } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import { statusColor, useTheme } from '@/lib/theme';
-import type { Transaction } from '@/lib/types';
+import type { Kind, Transaction } from '@/lib/types';
+import { Backdrop } from './Backdrop';
 import { Icon, type IconName } from './Icon';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/** A gentle press-in scale, the "it heard me" feedback. Skipped with reduced motion. */
+export function usePressScale(to = 0.97) {
+  const reduced = useReducedMotion();
+  const scale = useSharedValue(1);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return {
+    style,
+    onPressIn: () => { if (!reduced) scale.set(withTiming(to, { duration: 90 })); },
+    onPressOut: () => { if (!reduced) scale.set(withSpring(1, { damping: 14, stiffness: 260 })); },
+  };
+}
 
 // ------------------------------------------------------------------ //
 // Layout                                                              //
 // ------------------------------------------------------------------ //
 
-export function Screen({ children, refreshing, onRefresh, scroll = true, padded = true, bottomInset = true }: {
+/** Space a tab screen leaves at the bottom so its content can scroll clear of the floating tab bar. */
+export const TAB_BAR_HEIGHT = 62;
+
+export function Screen({ children, refreshing, onRefresh, scroll = true, padded = true, bottomInset = true, drift = false,
+  tabBar = false }: {
   children: ReactNode; refreshing?: boolean; onRefresh?: () => void; scroll?: boolean; padded?: boolean;
-  bottomInset?: boolean;
+  bottomInset?: boolean; drift?: boolean; tabBar?: boolean;
 }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const pad = { padding: padded ? 16 : 0, paddingBottom: (bottomInset ? insets.bottom : 0) + 32 };
-  if (!scroll) return <View style={[{ flex: 1, backgroundColor: colors.bg }, pad]}>{children}</View>;
+  const bottom = tabBar ? insets.bottom + TAB_BAR_HEIGHT + 24 : (bottomInset ? insets.bottom : 0) + 32;
+  const pad = { padding: padded ? 16 : 0, paddingBottom: bottom };
+  if (!scroll) {
+    return (
+      <View style={[{ flex: 1, backgroundColor: colors.bg }, pad]}>
+        <Backdrop drift={drift} />
+        {children}
+      </View>
+    );
+  }
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <Backdrop drift={drift} />
       <ScrollView
         contentContainerStyle={[pad, { gap: 14 }]}
         keyboardShouldPersistTaps="handled"
@@ -38,11 +67,15 @@ export function Screen({ children, refreshing, onRefresh, scroll = true, padded 
   );
 }
 
-export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+/** A frosted-glass panel. `strong` is less see-through, for forms and dense numbers. */
+export function Card({ children, style, strong }: { children: ReactNode; style?: StyleProp<ViewStyle>; strong?: boolean }) {
   const { colors } = useTheme();
   return (
-    <View style={[{ backgroundColor: colors.card, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.border, padding: 16, gap: 10 }, style]}>
+    <View style={[{
+      backgroundColor: strong ? colors.glassStrong : colors.glass, borderRadius: 20, borderWidth: 1,
+      borderColor: colors.glassBorder, padding: 16, gap: 10,
+      shadowColor: colors.shadow, shadowOpacity: 1, shadowRadius: 18, shadowOffset: { width: 0, height: 8 },
+    }, style]}>
       {children}
     </View>
   );
@@ -75,7 +108,7 @@ export function Money({ cents, currency, style, kind }: {
   cents: number; currency: string; style?: StyleProp<TextStyle>; kind?: 'expense' | 'income';
 }) {
   const { colors } = useTheme();
-  const color = kind === 'income' ? colors.good : colors.ink;
+  const color = kind === 'income' ? colors.credit : colors.ink;
   const sign = kind === 'income' ? '+' : kind === 'expense' ? '−' : '';
   return (
     <Text style={[{ fontSize: 15, fontWeight: '700', color, fontVariant: ['tabular-nums'] }, style]}>
@@ -96,19 +129,25 @@ export function Button({ title, onPress, variant = 'primary', icon, loading, dis
   const bg = { primary: colors.accent, ghost: 'transparent', danger: colors.danger, soft: colors.accentSoft }[variant];
   const fg = { primary: colors.onAccent, ghost: colors.ink, danger: '#fff', soft: colors.accentText }[variant];
   const off = disabled || loading;
+  const press = usePressScale();
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole="button"
-      accessibilityState={{ disabled: !!off }}
+      accessibilityState={{ disabled: !!off, busy: !!loading }}
       onPress={off ? undefined : onPress}
-      style={({ pressed }) => [{
-        backgroundColor: bg, borderRadius: 12, paddingVertical: small ? 8 : 13, paddingHorizontal: small ? 12 : 16,
+      onPressIn={off ? undefined : press.onPressIn}
+      onPressOut={press.onPressOut}
+      style={[{
+        backgroundColor: variant === 'ghost' ? colors.glass : bg, borderRadius: 14,
+        paddingVertical: small ? 9 : 14, paddingHorizontal: small ? 12 : 16, minHeight: small ? 38 : 48,
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-        borderWidth: variant === 'ghost' ? 1 : 0, borderColor: colors.border, opacity: off ? 0.55 : pressed ? 0.85 : 1,
-      }, style]}>
+        borderWidth: variant === 'ghost' ? 1 : 0, borderColor: colors.glassBorder, opacity: off ? 0.55 : 1,
+      }, variant === 'primary' && !off ? {
+        shadowColor: colors.accent, shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 3,
+      } : null, press.style, style]}>
       {loading ? <ActivityIndicator color={fg} size="small" /> : icon ? <Icon name={icon} size={small ? 16 : 18} color={fg} /> : null}
       <Text style={{ color: fg, fontWeight: '700', fontSize: small ? 14 : 15 }}>{title}</Text>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -134,8 +173,8 @@ export const Field = forwardRef<TextInput, TextInputProps & { label?: string; hi
           ref={ref}
           placeholderTextColor={colors.faint}
           style={[{
-            backgroundColor: colors.card, color: colors.ink, borderWidth: 1, borderColor: error ? colors.danger : colors.border,
-            borderRadius: 12, paddingHorizontal: 14, paddingVertical: Platform.OS === 'ios' ? 13 : 10, fontSize: 16,
+            backgroundColor: colors.glassStrong, color: colors.ink, borderWidth: 1,
+            borderColor: error ? colors.danger : colors.glassBorder, borderRadius: 14, paddingHorizontal: 14, paddingVertical: Platform.OS === 'ios' ? 13 : 10, fontSize: 16,
           }, style]}
           {...props}
         />
@@ -149,8 +188,9 @@ export function Chip({ label, active, onPress }: { label: string; active?: boole
   const { colors } = useTheme();
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: !!active }}
-      style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1,
-        backgroundColor: active ? colors.accent : colors.card, borderColor: active ? colors.accent : colors.border }}>
+      hitSlop={4}
+      style={{ paddingHorizontal: 13, paddingVertical: 8, borderRadius: 999, borderWidth: 1,
+        backgroundColor: active ? colors.accent : colors.glass, borderColor: active ? colors.accent : colors.glassBorder }}>
       <Text style={{ color: active ? colors.onAccent : colors.inkSoft, fontWeight: '600', fontSize: 13 }}>{label}</Text>
     </Pressable>
   );
@@ -166,24 +206,52 @@ export function Chips<T extends string>({ options, value, onChange }: {
   );
 }
 
-export function Segmented<T extends string>({ options, value, onChange }: {
-  options: { value: T; label: string }[]; value: T; onChange: (v: T) => void;
+/** A segmented control whose highlight slides to the chosen option. */
+export function Segmented<T extends string>({ options, value, onChange, big }: {
+  options: { value: T; label: string; color?: string }[]; value: T; onChange: (v: T) => void; big?: boolean;
 }) {
   const { colors } = useTheme();
+  const reduced = useReducedMotion();
+  const [width, setWidth] = useState(0);
+  const index = Math.max(0, options.findIndex((o) => o.value === value));
+  const segment = width ? (width - 6) / options.length : 0;
+  const target = index * segment;
+  const pill = useAnimatedStyle(() => ({
+    transform: [{ translateX: reduced ? target : withSpring(target, { damping: 18, stiffness: 220 }) }],
+  }), [target, reduced]);
+  const activeColor = options[index]?.color;
   return (
-    <View style={{ flexDirection: 'row', backgroundColor: colors.cardAlt, borderRadius: 12, padding: 3 }}>
+    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} accessibilityRole="radiogroup"
+      style={{ flexDirection: 'row', backgroundColor: colors.glass, borderRadius: 16, padding: 3, borderWidth: 1,
+        borderColor: colors.glassBorder }}>
+      {segment ? (
+        <Animated.View style={[{ position: 'absolute', top: 3, bottom: 3, left: 3, width: segment, borderRadius: 13,
+          backgroundColor: activeColor || colors.glassStrong,
+          shadowColor: colors.shadow, shadowOpacity: 1, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 }, pill]} />
+      ) : null}
       {options.map((o) => {
         const active = o.value === value;
         return (
-          <Pressable key={o.value} onPress={() => onChange(o.value)} accessibilityRole="button"
+          <Pressable key={o.value} onPress={() => onChange(o.value)} accessibilityRole="radio"
             accessibilityState={{ selected: active }}
-            style={{ flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center',
-              backgroundColor: active ? colors.card : 'transparent' }}>
-            <Text style={{ fontWeight: '700', color: active ? colors.ink : colors.muted }}>{o.label}</Text>
+            style={{ flex: 1, paddingVertical: big ? 12 : 9, borderRadius: 13, alignItems: 'center' }}>
+            <Text style={{ fontWeight: '800', fontSize: big ? 16 : 14,
+              color: active ? (o.color ? '#fff' : colors.ink) : colors.muted }}>{o.label}</Text>
           </Pressable>
         );
       })}
     </View>
+  );
+}
+
+/** − Debit / + Credit: the direction flag every transaction carries. */
+export function DirectionSwitch({ value, onChange }: { value: Kind; onChange: (v: Kind) => void }) {
+  const { colors } = useTheme();
+  return (
+    <Segmented<Kind> big value={value} onChange={onChange} options={[
+      { value: 'expense', label: '−  Debit', color: colors.debit },
+      { value: 'income', label: '+  Credit', color: colors.credit },
+    ]} />
   );
 }
 
@@ -269,12 +337,12 @@ export function TxRow({ tx, currency, onPress }: { tx: Transaction; currency: st
       style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, opacity: pressed ? 0.6 : 1 })}>
       <View style={{ width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
         backgroundColor: income ? colors.goodBg : colors.accentSoft }}>
-        <Text style={{ fontWeight: '800', color: income ? colors.good : colors.accentText }}>{tx.category.slice(0, 1)}</Text>
+        <Text style={{ fontWeight: '800', color: income ? colors.credit : colors.accentText }}>{tx.category.slice(0, 1)}</Text>
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={{ color: colors.ink, fontSize: 15, fontWeight: '600' }} numberOfLines={1}>{tx.description || tx.category}</Text>
         <Text style={{ color: colors.muted, fontSize: 12.5 }} numberOfLines={1}>
-          {tx.category} · {friendlyDate(tx.date)}{tx.recurring ? ' · recurring' : ''}
+          {tx.category} · {friendlyDate(tx.date)}{tx.time ? ` ${tx.time}` : ''}{tx.method ? ` · ${tx.method}` : ''}{tx.recurring ? ' · recurring' : ''}
         </Text>
       </View>
       <Money cents={tx.amount_cents} currency={currency} kind={tx.kind} />

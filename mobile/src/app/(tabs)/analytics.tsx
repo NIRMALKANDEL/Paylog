@@ -32,7 +32,7 @@ export default function AnalyticsScreen() {
   const fmt = (c: number) => formatMoney(c, cur);
 
   return (
-    <Screen refreshing={refreshing} onRefresh={refresh}>
+    <Screen refreshing={refreshing} onRefresh={refresh} tabBar>
       <Chips<Range> options={RANGES} value={range} onChange={setRange} />
       {error && !data ? <ErrorState message={error} onRetry={reload} /> : null}
       {!data && !error ? <Loading /> : null}
@@ -71,7 +71,7 @@ export default function AnalyticsScreen() {
 
             {data.income_categories.length ? (
               <Card>
-                <H2>Income sources</H2>
+                <H2>Credit sources</H2>
                 <CategoryBars items={data.income_categories} currency={cur} />
               </Card>
             ) : null}

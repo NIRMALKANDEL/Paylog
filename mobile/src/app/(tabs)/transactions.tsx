@@ -1,9 +1,11 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Backdrop } from '@/components/Backdrop';
 import { Icon } from '@/components/Icon';
-import { Chips, Divider, Empty, Muted, Notice, Row, Stat, TxRow } from '@/components/ui';
+import { Chips, Divider, Empty, Muted, Notice, Row, Stat, TAB_BAR_HEIGHT, TxRow } from '@/components/ui';
 import { api, errorMessage } from '@/lib/api';
 import { useUser } from '@/lib/auth';
 import { addDays, todayISO } from '@/lib/dates';
@@ -27,6 +29,7 @@ function periodRange(period: Period) {
 export default function Transactions() {
   const user = useUser();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [q, setQ] = useState('');
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<KindFilter>('');
@@ -117,7 +120,7 @@ export default function Transactions() {
       </Row>
 
       <Chips<KindFilter> value={kind} onChange={(k) => { setKind(k); setCategory(''); }}
-        options={[{ value: '', label: 'All' }, { value: 'expense', label: 'Expenses' }, { value: 'income', label: 'Income' }]} />
+        options={[{ value: '', label: 'All' }, { value: 'expense', label: '− Debit' }, { value: 'income', label: '+ Credit' }]} />
 
       {showFilters ? (
         <View style={{ gap: 10 }}>
@@ -133,10 +136,10 @@ export default function Transactions() {
       ) : null}
 
       {meta ? (
-        <Row style={{ backgroundColor: colors.card, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: colors.border }}>
+        <Row style={{ backgroundColor: colors.glassStrong, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: colors.glassBorder }}>
           <Stat label="Items" value={String(meta.summary.count)} />
-          <Stat label="Spent" value={formatMoney(meta.summary.expense, user.currency)} />
-          <Stat label="Income" value={formatMoney(meta.summary.income, user.currency)} tone={colors.good} />
+          <Stat label="− Debit" value={formatMoney(meta.summary.expense, user.currency)} tone={colors.debit} />
+          <Stat label="+ Credit" value={formatMoney(meta.summary.income, user.currency)} tone={colors.credit} />
         </Row>
       ) : null}
       {error ? <Notice tone="critical">{error}</Notice> : null}
@@ -144,9 +147,11 @@ export default function Transactions() {
   );
 
   return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <Backdrop />
     <FlatList
-      style={{ backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+      style={{ backgroundColor: 'transparent' }}
+      contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + TAB_BAR_HEIGHT + 24 }}
       data={items}
       keyExtractor={(t) => String(t.id)}
       ListHeaderComponent={header}
@@ -168,5 +173,6 @@ export default function Transactions() {
         : meta && meta.pages > 1 && meta.page >= meta.pages ? <Muted style={{ textAlign: 'center', marginTop: 12 }}>That’s everything.</Muted>
         : <Text> </Text>}
     />
+    </View>
   );
 }

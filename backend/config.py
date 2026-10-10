@@ -88,7 +88,9 @@ class Config:
     RECEIPT_AI_PROVIDER = os.environ.get("RECEIPT_AI_PROVIDER", "").strip().lower()
     ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
     RECEIPT_AI_MODEL = os.environ.get("RECEIPT_AI_MODEL", "claude-opus-5-5")
-    SHARE_MAX_BYTES = 12 * 1024 * 1024  # images shared from payment apps
+    # Free online text reader (https://ocr.space/ocrapi), offered when the phone can't read a receipt.
+    OCR_SPACE_API_KEY = os.environ.get("OCR_SPACE_API_KEY")
+    SHARE_MAX_BYTES =12 * 1024 * 1024  # images shared from payment apps
 
     # Shown on the privacy page so users know whom to contact.
     CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL")

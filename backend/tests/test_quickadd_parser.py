@@ -82,3 +82,14 @@ def test_errors(text):
 def test_long_input_is_truncated():
     f = q("250 " + "x" * 500)
     assert len(f["description"]) <= 200
+
+
+def test_widget_direction_and_category_win_over_words():
+    fields, _ = parse_quick("500 got refund", TODAY, kind="expense")
+    assert fields["kind"] == "expense"
+    fields, _ = parse_quick("1200 rahul", TODAY, kind="income")
+    assert fields["kind"] == "income" and fields["category"] == "Other"
+    fields, _ = parse_quick("250 lunch", TODAY, kind="expense", category="shopping")
+    assert fields["category"] == "Shopping"
+    fields, _ = parse_quick("250 lunch", TODAY, kind="bogus", category="Not a category")
+    assert (fields["kind"], fields["category"]) == ("expense", "Food")

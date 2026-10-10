@@ -60,6 +60,23 @@ Paylog makes a daily copy of the database by itself (in `BACKUP_DIR`, newest 14 
 someone uses the site each day. Free accounts can't run scheduled tasks, so nothing else is needed. On a paid
 account you can also add a task: `cd /home/devNirmal/Paylog/backend && venv/bin/flask --app app backup-db`
 
+## 7. Optional: online reader for receipts the phone can't read
+
+The app reads screenshots on the phone. When it can't find the amount, it can offer **Try the online reader**,
+which sends that one image to [OCR.space](https://ocr.space/ocrapi) (free tier: 25,000 images a month, 1 MB each;
+the app shrinks images first). It stays hidden until you turn it on:
+
+1. Get a free API key at https://ocr.space/ocrapi (it's emailed to you).
+2. Add it to the WSGI file next to the other settings, then **Reload**:
+   ```python
+   os.environ["OCR_SPACE_API_KEY"] = "K8..."
+   ```
+3. Check: https://devnirmal.pythonanywhere.com/api/v1/meta should show `"online_reader": true`.
+
+Free PythonAnywhere accounts can only reach websites on PythonAnywhere's allowlist. If `api.ocr.space` isn't on it,
+the app says "The online reader is unavailable right now" and the user types the details in. Nothing breaks.
+You can ask PythonAnywhere to add the site from their forums.
+
 ## Updating later
 
 ```bash

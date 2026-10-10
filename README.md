@@ -16,7 +16,7 @@ a home-screen widget, sign-ins that last 30 days, and no demo data.
 
 | Folder | What it is |
 |---|---|
-| `backend/` | Flask + SQLite server: the website **and** the JSON API the app uses (`/api/v1`). 299 tests. |
+| `backend/` | Flask + SQLite server: the website **and** the JSON API the app uses (`/api/v1`). 334 tests. |
 | `mobile/` | The Android + iOS app (Expo SDK 57, React Native 0.86, Expo Router, TypeScript). |
 | `brand/` | The logo (`logo.svg`, `logo-1024.png`). |
 
@@ -29,14 +29,18 @@ a home-screen widget, sign-ins that last 30 days, and no demo data.
   5 calculators (savings growth, goal planner, time to goal, emergency fund, loan EMI).
 - **Quick note:** type `250 lunch`, `salary 65000`, `2k rent yesterday` — one entry per line, with a live preview.
 - **Home-screen widget** (Android + iOS): a note card showing this month's spending.
-  - **Android:** tap it and a small note card slides up over the home screen with the keyboard open. Type
-    `250 lunch`, tap Save: it's added to your account straight away **without opening the app**, the widget's
+  - **Android:** tap it and a small note card slides up over the home screen with the keyboard open. Pick
+    **− Debit** or **+ Credit** (or let the words decide), type `250 lunch`, tap Save: it's added to your account straight away **without opening the app**, the widget's
     total updates, and you can Undo for a few seconds. Offline, notes wait on the phone and are sent as soon as
     you're back online (keeping the day you wrote them). Unsaved text stays as a draft, like a notes app.
     (Android widgets can't contain a text box themselves; this card is the closest thing.)
   - **iPhone:** tapping the widget opens the app's quick note with the keyboard up.
-- **Receipt scanning:** pick a GPay / PhonePe / Paytm / BHIM screenshot or photo a bill. The text is read **on the
-  phone** (Google ML Kit / Apple Vision); clearly read payments are saved instantly with Undo.
+- **Receipt scanning:** pick a GPay / PhonePe / Paytm / BHIM screenshot, photo a bill, or Share → Paylog. The text is
+  read **on the phone** (Google ML Kit / Apple Vision) and the amount, − debit / + credit, payee, date, time and UPI
+  reference are filled in. You see a review card and tap **Save** or **Edit**; nothing is saved without you. If the
+  amount can't be read, Paylog says so and offers an optional free online reader (OCR.space) or manual entry.
+  Already-saved payments (same UPI reference, or same amount and day) are flagged.
+- **− Debit / + Credit:** every transaction carries a direction flag. Totals for each are shown separately, by month.
 - **Design:** light / dark / system, 6 colour themes, 7 currencies (₹ with Indian grouping).
 
 ## Stay signed in (the Android logout fix)

@@ -14,12 +14,19 @@ internal class ApiException(val status: Int, message: String) : Exception(messag
 internal object Api {
   private const val TIMEOUT_MS = 15_000
 
-  /** One line ("250 lunch") -> saved transaction. Same endpoint the app uses. */
-  fun quickAdd(context: Context, line: String, writtenOn: String): JSONObject =
-    call(context, "POST", "/transactions/quick", JSONObject().put("q", line).put("written_on", writtenOn))
+  /**
+   * One line ("250 lunch") -> saved transaction. Same endpoint the app uses.
+   * `kind` ("expense" / "income") is the card's − / + switch; null lets the words decide.
+   */
+  fun quickAdd(context: Context, line: String, writtenOn: String, kind: String?): JSONObject {
+    val body = JSONObject().put("q", line).put("written_on", writtenOn)
+    if (kind != null) body.put("kind", kind)
+    return call(context, "POST", "/transactions/quick", body)
+  }
 
-  fun preview(context: Context, line: String): JSONObject =
-    call(context, "GET", "/transactions/quick/preview?q=" + URLEncoder.encode(line, "UTF-8"), null)
+  fun preview(context: Context, line: String, kind: String?): JSONObject =
+    call(context, "GET", "/transactions/quick/preview?q=" + URLEncoder.encode(line, "UTF-8") +
+      (if (kind != null) "&kind=$kind" else ""), null)
 
   fun delete(context: Context, id: Long) {
     call(context, "DELETE", "/transactions/$id", null)

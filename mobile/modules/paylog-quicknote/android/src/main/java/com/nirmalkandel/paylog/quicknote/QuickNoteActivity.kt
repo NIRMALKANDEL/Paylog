@@ -44,7 +44,11 @@ class QuickNoteActivity : Activity() {
   private lateinit var footer: TextView
   private lateinit var primary: TextView
   private lateinit var secondary: TextView
+  private lateinit var debitButton: TextView
+  private lateinit var creditButton: TextView
 
+  /** The − / + switch: "expense", "income", or null = decide from the words ("salary 65000"). */
+  private var kind: String? = null
   private var saving = false
   private var savedIds: List<Long> = emptyList()
   private var savedText = ""
@@ -57,6 +61,7 @@ class QuickNoteActivity : Activity() {
     val night = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
     colors = Palette.of(night)
     setContentView(buildViews())
+    paintKind()
 
     input.setText(Store.draft(this))
     input.setSelection(input.text.length)
@@ -101,6 +106,7 @@ class QuickNoteActivity : Activity() {
     primary.text = "Saving…"
     primary.isEnabled = false
     val writtenOn = Store.today()
+    val chosen = kind
     io.execute {
       val ids = mutableListOf<Long>()
       var last: String? = null
@@ -109,12 +115,12 @@ class QuickNoteActivity : Activity() {
       var left = emptyList<String>()
       for ((i, line) in lines.withIndex()) {
         try {
-          val res = Api.quickAdd(this, line, writtenOn)
+          val res = Api.quickAdd(this, line, writtenOn, chosen)
           res.optJSONObject("transaction")?.optLong("id")?.let { ids += it }
           last = Notes.describe(res)
         } catch (e: IOException) {
           // No internet: keep the rest on the phone and send them later.
-          Store.enqueue(this, lines.drop(i), writtenOn)
+          Store.enqueue(this, lines.drop(i), writtenOn, chosen)
           SyncWorker.schedule(this)
           outcome = Outcome.QUEUED
           break
@@ -203,12 +209,13 @@ class QuickNoteActivity : Activity() {
       preview.text = ""
       return
     }
+    val chosen = kind
     io.execute {
       val (text, ok) = try {
-        val res = Api.preview(this, line)
+        val res = Api.preview(this, line, chosen)
         if (res.optBoolean("ok")) {
-          val kind = if (res.optString("kind") == "income") "Income" else "Expense"
-          val parts = listOf("$kind ${res.optString("amount")}", res.optString("category"),
+          val direction = if (res.optString("kind") == "income") "+ Credit" else "− Debit"
+          val parts = listOf("$direction ${res.optString("amount")}", res.optString("category"),
             res.optString("description"), res.optString("when")).filter { it.isNotBlank() }
           parts.joinToString(" · ") to true
         } else {
@@ -223,6 +230,26 @@ class QuickNoteActivity : Activity() {
         preview.text = if (text.isBlank()) "" else (if (ok) "✓ " else "! ") + prefix + text
         preview.setTextColor(if (ok) colors.muted else colors.warning)
       }
+    }
+  }
+
+  // ---- − / + switch -------------------------------------------------------------
+
+  /** Tap a side to force it; tap it again to let the words decide. */
+  private fun chooseKind(value: String) {
+    kind = if (kind == value) null else value
+    paintKind()
+    main.removeCallbacks(runPreview)
+    preview()
+  }
+
+  private fun paintKind() {
+    for ((view, value, tint) in listOf(Triple(debitButton, "expense", colors.debit), Triple(creditButton, "income", colors.credit))) {
+      val on = kind == value
+      view.background = rounded(if (on) tint else colors.chip, 14f)
+      view.setTextColor(if (on) Color.WHITE else colors.ink)
+      view.contentDescription = (if (value == "income") "Credit, money received" else "Debit, money paid") +
+        if (on) ", selected" else ""
     }
   }
 
@@ -304,8 +331,21 @@ class QuickNoteActivity : Activity() {
     })
     card.addView(header)
 
+    // − Debit / + Credit. Untouched, the words decide ("salary 65000" is a credit).
+    val direction = LinearLayout(this).apply {
+      orientation = LinearLayout.HORIZONTAL
+      setPadding(0, dp(10), 0, dp(2))
+    }
+    debitButton = button("−  Debit", filled = false).apply { setOnClickListener { chooseKind("expense") } }
+    creditButton = button("+  Credit", filled = false).apply { setOnClickListener { chooseKind("income") } }
+    direction.addView(debitButton, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { marginEnd = dp(8) })
+    direction.addView(creditButton, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+    debitButton.gravity = Gravity.CENTER
+    creditButton.gravity = Gravity.CENTER
+    card.addView(direction, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+
     input = EditText(this).apply {
-      hint = "What did you spend?\n250 lunch"
+      hint = "250 lunch\n+1200 from Rahul"
       setHintTextColor(colors.faint)
       setTextColor(colors.ink)
       setTextSize(TypedValue.COMPLEX_UNIT_SP, 21f)
@@ -395,15 +435,15 @@ class QuickNoteActivity : Activity() {
   /** Same colours as the widget (src/widgets/QuickNoteWidget.tsx). */
   private data class Palette(
     val paper: Int, val ink: Int, val muted: Int, val faint: Int, val accent: Int, val onAccent: Int,
-    val chip: Int, val good: Int, val warning: Int, val scrim: Int,
+    val chip: Int, val good: Int, val warning: Int, val scrim: Int, val debit: Int, val credit: Int,
   ) {
     companion object {
       fun of(dark: Boolean) = if (dark) {
         Palette(c("#1f201e"), c("#f3f1ec"), c("#a5a29a"), c("#6f6c65"), c("#5fb3a9"), c("#0d1f1c"),
-          c("#2b3b38"), c("#7cc4a0"), c("#e0a35a"), c("#66000000"))
+          c("#2b3b38"), c("#7cc4a0"), c("#e0a35a"), c("#66000000"), c("#c2410c"), c("#1d7a4f"))
       } else {
         Palette(c("#fbf8f1"), c("#141413"), c("#6b6962"), c("#a9a69e"), c("#0e5e56"), c("#ffffff"),
-          c("#e3efec"), c("#1d7a4f"), c("#a3570f"), c("#4d000000"))
+          c("#e3efec"), c("#1d7a4f"), c("#a3570f"), c("#4d000000"), c("#c2410c"), c("#0f7a2e"))
       }
 
       private fun c(hex: String) = Color.parseColor(hex)

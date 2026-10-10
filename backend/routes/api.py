@@ -38,7 +38,8 @@ from services.dates import add_months, last_n_month_keys, month_end, month_start
 from services.mailer import mail_enabled
 from services.money import format_money, parse_amount
 from services.receipt_ai import ReceiptAIError, ai_enabled, extract_receipt
-from services.receipts import MAX_TEXT_LENGTH, parse_receipt_text
+from services.receipt_ocr import OnlineReaderError, ocr_enabled, read_lines
+from services.receipts import MAX_TEXT_LENGTH, parse_receipt_lines, parse_receipt_text
 from services.recurring import run_due
 from services.security import email_ip_throttle, email_throttle, login_throttle
 from services.tokens import session_fingerprint
@@ -160,6 +161,8 @@ def tx_json(row):
         "date": row["date"],
         "description": row["description"],
         "reference": row["reference"] if "reference" in row.keys() else None,
+        "time": row["time"] if "time" in row.keys() else None,
+        "method": row["method"] if "method" in row.keys() else None,
         "recurring": bool(row["recurring_id"]) if "recurring_id" in row.keys() else False,
     }
 
@@ -268,6 +271,7 @@ def meta():
         ranges={k: v[0] for k, v in RANGES.items()},
         mail_enabled=mail_enabled(),
         receipt_ai=ai_enabled(),
+        online_reader=online_reader(),
     )
 
 
@@ -473,28 +477,38 @@ def dashboard():
     db = get_db()
     user = g.user
     uid = user["id"]
-    now = today()
-    this_first = month_start(now)
+    real_today = today()
+    current = month_start(real_today)
+    # ?month=YYYY-MM looks back at an earlier month; the future isn't shown.
+    this_first = min(parse_month(request.args.get("month"), current), current)
+    is_current = this_first == current
+    now = real_today if is_current else month_end(this_first)
     prev_first = add_months(this_first, -1)
     trend = analytics.monthly_series(db, uid, last_n_month_keys(now, 6))
     recent = db.execute(
-        "SELECT * FROM transactions WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT 6", (uid,)
+        "SELECT * FROM transactions WHERE user_id = ? AND date BETWEEN ? AND ?"
+        " ORDER BY date DESC, id DESC LIMIT 8",
+        (uid, this_first.isoformat(), month_end(this_first).isoformat()),
     ).fetchall()
     goals = db.execute(
         "SELECT * FROM goals WHERE user_id = ? ORDER BY (saved_cents * 1.0 / target_cents) DESC LIMIT 3", (uid,)
     ).fetchall()
     has_any = db.execute("SELECT 1 FROM transactions WHERE user_id = ? LIMIT 1", (uid,)).fetchone()
     return jsonify(
-        month_name=now.strftime("%B %Y"),
-        today=now.isoformat(),
+        month=this_first.isoformat()[:7],
+        month_name=this_first.strftime("%B %Y"),
+        is_current=is_current,
+        prev_month=add_months(this_first, -1).isoformat()[:7],
+        next_month=None if is_current else add_months(this_first, 1).isoformat()[:7],
+        today=real_today.isoformat(),
         has_any=bool(has_any),
         this_month=analytics.totals(db, uid, this_first, month_end(now)),
         last_month=analytics.totals(db, uid, prev_first, month_end(prev_first)),
         categories=analytics.category_totals(db, uid, this_first, month_end(now)),
         budget=budget_json(analytics.budget_status(db, user, this_first)),
         recent=[tx_json(r) for r in recent],
-        goals=[goal_json(describe_goal(r, now)) for r in goals],
-        insights=analytics.dashboard_insights(db, user, now, fmt_money),
+        goals=[goal_json(describe_goal(r, real_today)) for r in goals],
+        insights=analytics.dashboard_insights(db, user, now, fmt_money) if is_current else [],
         trend=trend,
         pace={
             "days_in_month": month_end(now).day,
@@ -559,16 +573,21 @@ def get_transaction(tx_id):
 
 @bp.put("/transactions/<int:tx_id>")
 def update_transaction(tx_id):
-    tx_routes.get_owned_transaction(tx_id)
-    clean, error = tx_routes.validate_transaction(body())
+    tx = tx_routes.get_owned_transaction(tx_id)
+    data = body()
+    clean, error = tx_routes.validate_transaction(data)
     if error:
         fail(error)
+    # Older app versions don't send time/method: keep what's saved instead of clearing it.
+    for key in ("time", "method"):
+        if key not in data:
+            clean[key] = tx[key]
     db = get_db()
     db.execute(
-        "UPDATE transactions SET kind = ?, amount_cents = ?, category = ?, date = ?, description = ?"
-        " WHERE id = ? AND user_id = ?",
+        "UPDATE transactions SET kind = ?, amount_cents = ?, category = ?, date = ?, description = ?,"
+        " time = ?, method = ? WHERE id = ? AND user_id = ?",
         (clean["kind"], clean["amount_cents"], clean["category"], clean["date"], clean["description"],
-         tx_id, g.user["id"]),
+         clean["time"], clean["method"], tx_id, g.user["id"]),
     )
     db.commit()
     return jsonify(ok=True, transaction=tx_json(tx_routes.get_owned_transaction(tx_id)))
@@ -585,7 +604,7 @@ def delete_transaction(tx_id):
 
 @bp.get("/transactions/quick/preview")
 def quick_preview():
-    clean, error = tx_routes.quick_parse(request.args.get("q", ""))
+    clean, error = tx_routes.quick_parse(request.args.get("q", ""), None, request.args.get("kind"))
     if error:
         return jsonify(ok=False, error=error)
     return jsonify(ok=True, **tx_routes.describe_quick(clean))
@@ -613,7 +632,8 @@ def quick_add():
     when the phone is a day ahead of the server (India just after midnight vs UTC).
     """
     data = body()
-    clean, error = tx_routes.quick_parse(data.get("q", ""), written_day(data.get("written_on")))
+    clean, error = tx_routes.quick_parse(data.get("q", ""), written_day(data.get("written_on")),
+                                         data.get("kind"), data.get("category"))
     if error:
         fail(error)
     tx_id = tx_routes.insert_transaction(g.user["id"], clean)
@@ -648,48 +668,64 @@ def import_csv():
 
 @bp.post("/receipts/parse")
 def parse_receipt():
-    """Receipt text (read on the phone) -> draft transaction, auto-saved when clear.
+    """Receipt read on the phone -> a draft transaction for the user to review.
 
-    With the AI reader enabled, an `image` file can be sent instead of text.
+    Send `lines` (the phone's OCR, [{"text", "height"}...], top to bottom) or plain
+    `text` (a bank SMS, shared text). Or, as multipart, an `image` for the online
+    reader when the phone couldn't read it. Nothing is saved here: the app shows
+    the draft, and the user saves it (or edits it first).
     """
     now = today()
-    is_json = request.is_json
     data = body()
-    text = (data.get("text") or "")[:MAX_TEXT_LENGTH]
-    receipt, notice = None, None
-    image = None if is_json else request.files.get("image")
-    if image and ai_enabled():
-        from routes.receipts import read_image
-
-        raw, media_type = read_image(image, 5 * 1024 * 1024)
-        if raw:
-            try:
-                receipt = extract_receipt(raw, media_type, now)
-            except ReceiptAIError as exc:
-                notice = str(exc)
-    if receipt is None:
-        if not text.strip():
-            fail(notice or "We couldn't find any text in that image. Try a sharper screenshot.", 422)
-        receipt = parse_receipt_text(text, now)
+    receipt = None
+    image = None if request.is_json else request.files.get("image")
+    if image:
+        receipt = read_online(image, now)
+    else:
+        lines = data.get("lines")
+        if isinstance(lines, list) and lines:
+            receipt = parse_receipt_lines(lines, now)
+        else:
+            text = (data.get("text") or "")[:MAX_TEXT_LENGTH]
+            if not text.strip():
+                fail("We couldn't find any text in that image.", 422)
+            receipt = parse_receipt_text(text, now)
 
     form = receipt.to_form(now)
     duplicate = tx_routes.find_duplicate(g.user["id"], receipt.reference)
-    saved = None
-    allow_auto = data.get("auto_save", True) not in (False, "0", "false")
-    if allow_auto and g.user["auto_save_receipts"] and receipt.is_clear() and not duplicate and not notice:
-        clean, error = tx_routes.validate_transaction(form)
-        if not error:
-            saved = tx_json(tx_routes.get_owned_transaction(tx_routes.insert_transaction(g.user["id"], clean)))
+    similar = None
+    if not duplicate and receipt.amount_cents and receipt.date:
+        similar = tx_routes.find_similar(g.user["id"], receipt.kind, receipt.amount_cents, receipt.date)
     return jsonify(
         ok=True,
         form=form,
         found=sorted(receipt.found),
+        warnings=receipt.warnings,
         app=receipt.app,
-        clear=receipt.is_clear(),
         duplicate=dict(duplicate) if duplicate else None,
-        saved=saved,
-        notice=notice,
+        similar=dict(similar) if similar else None,
     )
+
+
+def read_online(image, now):
+    """Read an uploaded receipt image with the configured online reader, or fail with a clear message."""
+    from routes.receipts import read_image
+
+    if not online_reader():
+        fail("Online reading isn't set up on this server. Please enter the details yourself.", 503)
+    raw, media_type = read_image(image, 5 * 1024 * 1024)
+    if not raw:
+        fail("Choose a JPG, PNG or WebP image.", 400)
+    try:
+        if ai_enabled():
+            return extract_receipt(raw, media_type, now)
+        return parse_receipt_lines(read_lines(raw, media_type), now)
+    except (ReceiptAIError, OnlineReaderError) as exc:
+        fail(f"{exc} Please enter the details yourself.", 422)
+
+
+def online_reader():
+    return ai_enabled() or ocr_enabled()
 
 
 # ------------------------------------------------------------------ #

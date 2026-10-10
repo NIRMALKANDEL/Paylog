@@ -221,5 +221,57 @@ def test_ocr_paytm_yen_for_rupee():
     assert (r.amount_cents, r.payee, r.date) == (21200, "Uber India", "2026-09-22")
 
 
+@pytest.mark.parametrize("text,kind,amount,payee", [
+    ("Paid ₹500 to Rahul", "expense", 50000, "Rahul"),
+    ("Received ₹1,200 from Rahul", "income", 120000, "Rahul"),
+    ("Payment to you\n₹750\nPaid · 3 Oct", "income", 75000, None),
+    ("Payment of Rs. 1200 received by Paytm", "expense", 120000, None),
+])
+def test_direction_from_wording(text, kind, amount, payee):
+    r = parse_receipt_text(text, TODAY)
+    assert (r.kind, r.amount_cents) == (kind, amount)
+    assert r.kind_confident and "direction" not in r.warnings
+    if payee:
+        assert r.payee == payee
+
+
+def test_no_direction_wording_is_flagged():
+    r = parse_receipt_text("₹350\n13 Sep 2026", TODAY)
+    assert r.kind == "expense" and "direction" in r.warnings
+
+
+def test_payment_successful_takes_the_amount_not_ids():
+    r = parse_receipt_text("Payment successful\n₹350\nUPI Ref 425612345678\nCall 9876543210", TODAY)
+    assert r.amount_cents == 35000 and r.reference == "425612345678"
+
+
+def test_balance_is_never_the_amount():
+    r = parse_receipt_text("Paid to Ramesh\n₹500\nAvailable balance ₹12,450.00", TODAY)
+    assert r.amount_cents == 50000
+
+
+def test_bill_total_beats_subtotal_tax_and_cash():
+    text = "MORE RETAIL\nSubtotal 200.00\nCGST 2.5% 5.00\nSGST 2.5% 5.00\nGrand Total 210.00\nCash 500.00\nChange 290.00"
+    assert parse_receipt_text(text, TODAY).amount_cents == 21000
+
+
+def test_bank_branch_code_is_not_a_misread_rupee():
+    assert parse_receipt_text("Paid to Google\nCitibank Z139", TODAY).amount_cents is None
+
+
+@pytest.mark.parametrize("words,value", [
+    ("Five Hundred", 500), ("One Lakh Twenty Thousand", 120000), ("Two Thousand and Fifty", 2050),
+    ("Five Banana", None),
+])
+def test_amount_in_words(words, value):
+    r = parse_receipt_text(f"Rupees {words} Only", TODAY)
+    assert r.amount_cents == (value * 100 if value else None)
+
+
+def test_status_bar_clock_is_not_the_payment_time():
+    r = parse_receipt_text("12:34\nPaid to X\n₹10\n12 Sep 2026, 8:41 pm", TODAY)
+    assert r.time == "20:41"
+
+
 def test_lookalike_does_not_swallow_digits():
     assert parse_receipt_text("Paid to X\n%250", TODAY).amount_cents == 25000

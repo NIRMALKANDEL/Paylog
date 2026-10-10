@@ -35,7 +35,7 @@ function Legend({ items }: { items: { color: string; label: string }[] }) {
   );
 }
 
-/** Income vs spending per month, as paired bars. */
+/** Credit vs debit per month, as paired bars. */
 export function MonthBars({ months, currency, height = 170 }: { months: MonthPoint[]; currency: string; height?: number }) {
   const { colors } = useTheme();
   const { width, onLayout } = useWidth();
@@ -67,7 +67,7 @@ export function MonthBars({ months, currency, height = 170 }: { months: MonthPoi
           </Svg>
         ) : <View style={{ height }} />}
       </View>
-      <Legend items={[{ color: colors.income, label: 'Income' }, { color: colors.expense, label: 'Spending' }]} />
+      <Legend items={[{ color: colors.income, label: 'Credit' }, { color: colors.expense, label: 'Debit' }]} />
     </View>
   );
 }

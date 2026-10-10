@@ -1,5 +1,6 @@
+import { BlurView } from 'expo-blur';
 import { router, Tabs } from 'expo-router';
-import { Pressable, View, type ColorValue } from 'react-native';
+import { Platform, Pressable, View, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, type IconName } from '@/components/Icon';
@@ -12,7 +13,7 @@ function tabIcon(name: IconName) {
 }
 
 export default function TabLayout() {
-  const { colors } = useTheme();
+  const { colors, dark } = useTheme();
   const insets = useSafeAreaInsets();
   return (
     <Tabs
@@ -23,7 +24,18 @@ export default function TabLayout() {
         headerTitleStyle: { fontWeight: '700' },
         tabBarActiveTintColor: colors.accentText,
         tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border, height: 60 + insets.bottom, paddingTop: 6 },
+        tabBarStyle: {
+          // iOS blurs what scrolls underneath; Android can't cheaply, so its bar is solid
+          // (see-through text under the tab labels is hard to read).
+          backgroundColor: Platform.OS === 'ios' ? 'transparent' : colors.card,
+          borderTopColor: colors.glassBorder, borderTopWidth: 1,
+          height: 62 + insets.bottom, paddingTop: 6, borderTopLeftRadius: 22, borderTopRightRadius: 22,
+          position: 'absolute', elevation: 0, shadowColor: colors.shadow, shadowOpacity: 1, shadowRadius: 20,
+          shadowOffset: { width: 0, height: -6 },
+        },
+        tabBarBackground: Platform.OS === 'ios'
+          ? () => <BlurView intensity={60} tint={dark ? 'dark' : 'light'} style={{ flex: 1, borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: 'hidden' }} />
+          : undefined,
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
         sceneStyle: { backgroundColor: colors.bg },
       }}>

@@ -7,10 +7,13 @@ import { AppState } from 'react-native';
 
 import { Loading } from '@/components/ui';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { loadLastCategories } from '@/lib/prefs';
 import { ThemeProvider, useTheme } from '@/lib/theme';
+import { ToastProvider } from '@/lib/toast';
 import { refreshWidgets } from '@/lib/widget';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+loadLastCategories();
 
 // Back from a deep-linked screen (widget, share) lands on Home.
 export const unstable_settings = { initialRouteName: '(tabs)' };
@@ -91,7 +94,9 @@ function Themed() {
   const { user } = useAuth();
   return (
     <ThemeProvider mode={user?.mode} themeKey={user?.theme} accent={user?.accent}>
-      <Navigator />
+      <ToastProvider>
+        <Navigator />
+      </ToastProvider>
     </ThemeProvider>
   );
 }

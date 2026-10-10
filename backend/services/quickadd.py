@@ -110,8 +110,14 @@ def _keyword_category(words, table):
     return None
 
 
-def parse_quick(text, today):
-    """Return (fields, error). fields is a dict ready for validate_transaction."""
+def parse_quick(text, today, kind=None, category=None):
+    """Return (fields, error). fields is a dict ready for validate_transaction.
+
+    `kind` ("income"/"expense") and `category`, when given (the widget's + / − switch
+    and category chips), win over anything guessed from the words.
+    """
+    forced_kind = kind if kind in ("income", "expense") else None
+    forced_category = category
     raw = (text or "").strip()[:MAX_LENGTH]
     if not raw:
         return None, "Type something like “250 lunch”."
@@ -135,12 +141,15 @@ def parse_quick(text, today):
 
     if INCOME_WORDS.search(rest):
         kind = "income"
+    if forced_kind:
+        kind = forced_kind
 
     words = [w for w in re.findall(r"[\w&'.@-]+", rest.lower()) if w not in FILLER]
     valid = INCOME_CATEGORIES if kind == "income" else EXPENSE_CATEGORIES
 
     # An explicit category name wins ("300 shopping"), and isn't repeated in the description.
-    category = next((c for c in valid if c.lower() in words), None)
+    category = next((c for c in valid if forced_category and c.lower() == forced_category.strip().lower()), None)
+    category = category or next((c for c in valid if c.lower() in words), None)
     description_words = [w for w in re.findall(r"[\w&'.@-]+", rest) if w.lower() not in FILLER]
     if category:
         description_words = [w for w in description_words if w.lower() != category.lower()]

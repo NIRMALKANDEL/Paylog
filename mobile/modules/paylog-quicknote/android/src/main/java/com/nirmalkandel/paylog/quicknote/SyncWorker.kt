@@ -29,7 +29,8 @@ class SyncWorker(context: Context, params: WorkerParameters) : Worker(context, p
         continue
       }
       try {
-        lastSaved = Notes.describe(Api.quickAdd(context, note.getString("q"), note.getString("on")))
+        val kind = if (note.has("kind")) note.getString("kind") else null
+        lastSaved = Notes.describe(Api.quickAdd(context, note.getString("q"), note.getString("on"), kind))
         sent++
       } catch (e: IOException) {
         left.put(note)

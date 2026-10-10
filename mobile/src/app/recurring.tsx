@@ -81,7 +81,7 @@ export default function RecurringScreen() {
       <Card>
         <Row>
           <Stat label="Bills / month" value={fmt(data.monthly.expense)} />
-          <Stat label="Income / month" value={fmt(data.monthly.income)} tone={colors.good} />
+          <Stat label="Credit / month" value={fmt(data.monthly.income)} tone={colors.good} />
         </Row>
       </Card>
       {data.rules.length ? (

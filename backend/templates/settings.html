@@ -110,19 +110,6 @@
     </form>
 </section>
 
-<section class="card" id="receipts">
-    <h2 class="card-title">{{ m.icon("scan", 18) }} Receipts</h2>
-    <form method="POST" action="{{ url_for('settings.receipt_settings') }}">
-        {{ m.csrf() }}
-        <label class="checkbox">
-            <input type="checkbox" name="auto_save_receipts" value="1" {% if current_user.auto_save_receipts %}checked{% endif %}>
-            Save receipts automatically when the amount, date and payee are read clearly
-        </label>
-        <p class="muted small">You'll get an Undo button right after. Unclear receipts and possible duplicates always show the form first.</p>
-        <div class="form-actions"><button type="submit" class="btn-primary">Save</button></div>
-    </form>
-</section>
-
 <section class="card" id="install">
     <h2 class="card-title">{{ m.icon("download", 18) }} Install on your phone</h2>
     <p class="muted" data-install-installed hidden>{{ m.icon("check", 14) }} Paylog is installed and open as an app on this device.</p>

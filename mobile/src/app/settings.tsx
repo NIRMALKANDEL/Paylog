@@ -3,7 +3,7 @@ import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
-import { Alert, Pressable, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 
 import { Button, Card, Chip, Field, H2, Label, Muted, Notice, Row, Screen, Segmented } from '@/components/ui';
 import { api, API_URL, errorMessage } from '@/lib/api';
@@ -108,17 +108,6 @@ export default function Settings() {
             );
           })}
         </View>
-      </Card>
-
-      <Card>
-        <Row>
-          <View style={{ flex: 1, gap: 2 }}>
-            <H2>Save clear receipts automatically</H2>
-            <Muted>When a scanned payment is read clearly, save it straight away (with Undo) instead of showing the form.</Muted>
-          </View>
-          <Switch value={user.auto_save_receipts} onValueChange={(v) => { patch({ auto_save_receipts: v }); }}
-            trackColor={{ true: colors.accent, false: colors.border }} thumbColor="#fff" accessibilityLabel="Save clear receipts automatically" />
-        </Row>
       </Card>
 
       <Card>

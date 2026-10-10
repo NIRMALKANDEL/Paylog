@@ -24,6 +24,8 @@ export type Transaction = {
   date: string;
   description: string;
   reference: string | null;
+  time: string | null; // HH:MM
+  method: string | null; // payment app or method, e.g. Google Pay, Cash
   recurring: boolean;
 };
 
@@ -60,7 +62,11 @@ export type Rule = {
 };
 
 export type Dashboard = {
+  month: string; // YYYY-MM
   month_name: string;
+  is_current: boolean;
+  prev_month: string;
+  next_month: string | null;
   today: string;
   has_any: boolean;
   this_month: Totals;

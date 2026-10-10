@@ -28,7 +28,7 @@ export default function More() {
   }
 
   return (
-    <Screen>
+    <Screen tabBar>
       <Card style={{ gap: 0, paddingVertical: 4 }}>
         {LINKS.map((link, i) => (
           <View key={link.title}>
