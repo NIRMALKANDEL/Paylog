@@ -22,8 +22,8 @@
 <section class="card onboarding">
     <h2 class="card-title">Let's set up your money map</h2>
     <ol class="steps">
-        <li><a href="{{ url_for('transactions.create', kind='income') }}">Add your income</a> — salary, freelance or anything else.</li>
-        <li><a href="{{ url_for('transactions.create') }}">Log a few expenses</a>, or <a href="{{ url_for('transactions.import_csv') }}">import a CSV</a> from your bank.</li>
+        <li><a href="{{ url_for('transactions.create') }}">Record a few payments</a> (− debits), or <a href="{{ url_for('receipts.scan') }}">scan a payment screenshot</a>.</li>
+        <li><a href="{{ url_for('transactions.create', kind='income') }}">Add money you received</a> (+ credits) — salary, refunds, a friend paying you back. Or <a href="{{ url_for('transactions.import_csv') }}">import a CSV</a> from your bank.</li>
         <li><a href="{{ url_for('budgets.index') }}">Set a monthly budget</a> so Paylog can warn you early.</li>
         <li><a href="{{ url_for('goals.index') }}">Create a savings goal</a> and track progress.</li>
     </ol>
