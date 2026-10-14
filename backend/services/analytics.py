@@ -277,8 +277,9 @@ def dashboard_insights(db, user, today, fmt):
         tone = "good" if rate >= 20 else ("warning" if rate >= 0 else "critical")
         insights.append({
             "tone": tone,
-            "text": f"Last month you saved {rate:.0f}% of your income"
-                    + (" — nicely above the 20% rule of thumb." if rate >= 20 else "."),
+            "text": (f"Last month you spent {-rate:.0f}% more than your income." if rate < 0 else
+                     f"Last month you saved {rate:.0f}% of your income"
+                     + (" — nicely above the 20% rule of thumb." if rate >= 20 else ".")),
         })
     return insights
 
@@ -341,7 +342,8 @@ def range_insights(db, user_id, start, end, fmt):
         rate = summary["savings_rate"]
         insights.append({
             "tone": "good" if rate >= 20 else ("warning" if rate >= 0 else "critical"),
-            "text": f"You kept {rate:.0f}% of your income over this period.",
+            "text": (f"You spent {-rate:.0f}% more than your income over this period." if rate < 0 else
+                     f"You kept {rate:.0f}% of your income over this period."),
         })
     return insights
 

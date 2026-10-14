@@ -42,6 +42,12 @@ Write-Host "2/4 Installing packages"
 npm ci --include=dev --no-audit --no-fund
 if ($LASTEXITCODE) { throw "npm ci failed" }
 
+Write-Host "   Checking the code (type-check and lint)"
+npx tsc --noEmit
+if ($LASTEXITCODE) { throw "type-check failed: fix the errors above, then build again" }
+npx expo lint
+if ($LASTEXITCODE) { throw "lint failed: fix the errors above, then build again" }
+
 Write-Host "3/4 Generating the native Android project"
 npx expo prebuild --platform android --clean --no-install
 if ($LASTEXITCODE) { throw "prebuild failed" }

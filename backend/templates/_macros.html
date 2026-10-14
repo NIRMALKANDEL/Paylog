@@ -57,7 +57,7 @@
     <span class="tx-cat cat-dot" data-kind="{{ tx.kind }}">{{ tx.category[:1] }}</span>
     <div class="tx-main">
         <span class="tx-desc">{{ tx.description or tx.category }}</span>
-        <span class="tx-meta">{{ tx.category }} · {{ tx.date }}{% if tx.method %} · {{ tx.method }}{% endif %}{% if tx.recurring_id %} · <span class="tag">recurring</span>{% endif %}</span>
+        <span class="tx-meta">{% if tx.description %}<span class="nw">{{ tx.category }}</span> · {% endif %}<span class="nw">{{ tx.date }}</span>{% if tx.method %} · <span class="nw">{{ tx.method }}</span>{% endif %}{% if tx.recurring_id %} · <span class="tag">recurring</span>{% endif %}</span>
     </div>
     {{ amount(tx) }}
     {% if show_actions %}

@@ -642,6 +642,8 @@ textarea.form-input { line-height: 1.5; }
 }
 .stat-label { font-size: 0.8rem; font-weight: 600; color: var(--ink-muted); display: inline-flex; align-items: center; gap: 0.45rem; }
 .stat-value { font-weight: 800; font-size: clamp(1.4rem, 2.3vw, 1.9rem); line-height: 1.15; letter-spacing: -0.03em; overflow-wrap: anywhere; }
+/* main.js shrinks big figures to fit their box instead of breaking them across lines. */
+.js-fit { white-space: nowrap; overflow-wrap: normal; transition: none !important; }
 .stat-delta { font-size: 0.78rem; display: inline-flex; align-items: center; gap: 0.25rem; }
 .delta-good { color: var(--good); }
 .delta-bad { color: var(--danger); }
@@ -701,6 +703,7 @@ textarea.form-input { line-height: 1.5; }
 .tx-main { display: flex; flex-direction: column; min-width: 0; }
 .tx-desc { font-size: 0.92rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tx-meta { font-size: 0.78rem; color: var(--ink-muted); }
+.nw { white-space: nowrap; }
 .amount { font-weight: 700; font-size: 0.95rem; white-space: nowrap; }
 .amount-income { color: var(--credit); }
 .amount-expense { color: var(--ink); }
@@ -757,6 +760,8 @@ textarea.form-input { line-height: 1.5; }
 .contribute-form { display: flex; gap: 0.5rem; }
 .contribute-form .form-input { flex: 1; min-width: 0; }
 /* Shared expenses */
+.form-group .checkbox { display: flex; font-weight: 500; margin: 0.5rem 0 0; }
+.card-foot form { flex-shrink: 0; }
 .split-share { align-items: center; margin: 0.4rem 0; }
 .split-share label { flex: 1; min-width: 0; font-size: 0.9rem; }
 .split-share .form-input { flex: 0 0 8rem; }

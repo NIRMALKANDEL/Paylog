@@ -76,6 +76,8 @@ function Navigator() {
           <Stack.Screen name="budgets" options={{ title: 'Budgets' }} />
           <Stack.Screen name="goals" options={{ title: 'Savings goals' }} />
           <Stack.Screen name="recurring" options={{ title: 'Recurring' }} />
+          <Stack.Screen name="shared/index" options={{ title: 'Shared expenses' }} />
+          <Stack.Screen name="shared/[id]" options={{ title: 'Group' }} />
           <Stack.Screen name="calculators" options={{ title: 'Calculators' }} />
           <Stack.Screen name="settings" options={{ title: 'Settings' }} />
           <Stack.Screen name="import" options={{ title: 'Import CSV' }} />

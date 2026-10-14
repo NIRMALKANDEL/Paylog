@@ -8,9 +8,10 @@ import { CategoryBars, MonthBars, PaceChart } from '@/components/Charts';
 import { Icon } from '@/components/Icon';
 import { QuickBar } from '@/components/QuickBar';
 import {
-  Body, Button, Card, Empty, ErrorState, H2, IconButton, Loading, Logo, Muted, Notice, Progress, Row, Screen, TxRow,
+  Body, Button, Card, Empty, ErrorState, H2, IconButton, Loading, Logo, Money, Muted, Notice, Progress, Row, Screen, TxRow,
 } from '@/components/ui';
 import { useUser } from '@/lib/auth';
+import { friendlyDate } from '@/lib/dates';
 import { formatMoney } from '@/lib/money';
 import { useTheme } from '@/lib/theme';
 import type { Dashboard } from '@/lib/types';
@@ -175,6 +176,30 @@ function DashboardBody({ data, currency, onMonth }: { data: Dashboard; currency:
               <Notice tone="info">Optional: set a monthly spending limit to see how you’re pacing. Tap to set one.</Notice>
             </Pressable>
           )}
+        </Appear>
+      ) : null}
+
+      {data.upcoming?.length ? (
+        <Appear index={i++}>
+          <Card style={{ gap: 0 }}>
+            <Row style={{ justifyContent: 'space-between', marginBottom: 4 }}>
+              <H2>Coming up this week</H2>
+              <Pressable onPress={() => router.push('/recurring')} hitSlop={8} accessibilityRole="link">
+                <Text style={{ color: colors.accentText, fontWeight: '600' }}>Recurring</Text>
+              </Pressable>
+            </Row>
+            {data.upcoming.map((rule) => (
+              <Row key={rule.id} style={{ paddingVertical: 8 }} gap={12}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={{ color: colors.ink, fontSize: 15, fontWeight: '600' }} numberOfLines={1}>
+                    {rule.description || rule.category}
+                  </Text>
+                  <Muted numberOfLines={1}>{friendlyDate(rule.next_date)}</Muted>
+                </View>
+                <Money cents={rule.amount_cents} currency={currency} kind={rule.kind} />
+              </Row>
+            ))}
+          </Card>
         </Appear>
       ) : null}
 

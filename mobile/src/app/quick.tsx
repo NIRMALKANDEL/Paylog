@@ -18,7 +18,7 @@ import { useTheme } from '@/lib/theme';
 import type { Kind, QuickPreview, Transaction } from '@/lib/types';
 import { refreshWidgets, updateWidgets } from '@/lib/widget';
 
-const MAX_LINES = 10;
+const MAX_LINES = 20; // the server's limit for one note
 const EXAMPLES = ['250 lunch', 'salary 65000', '2k rent', 'uber 180 yesterday', '900 on 12 sep'];
 
 const isDigit = (ch: string | undefined) => !!ch && ch >= '0' && ch <= '9';
@@ -42,7 +42,12 @@ function linesOf(text: string) {
     }
   }
   parts.push(current);
-  return parts.map((l) => l.trim()).filter(Boolean).slice(0, MAX_LINES);
+  return parts.map((l) => l.trim()).filter(Boolean);
+}
+
+/** A random id for one note, so a save retried after a dropped connection isn't saved twice. */
+function newNoteId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
 export default function Quick() {
@@ -59,8 +64,12 @@ export default function Quick() {
   const [saved, setSaved] = useState<Transaction[] | null>(null);
   // − / + switch: null lets the words decide ("salary 65000" is a credit).
   const [kind, setKind] = useState<Kind | null>(null);
+  // Kept while the same note is retried; a new one after a save or an edit.
+  const noteId = useRef<string | null>(null);
 
-  const lines = linesOf(text);
+  const allLines = linesOf(text);
+  const tooMany = allLines.length > MAX_LINES;
+  const lines = allLines.slice(0, MAX_LINES);
 
   // Live preview of what each line will save (debounced, cached per line).
   useEffect(() => {
@@ -100,6 +109,10 @@ export default function Quick() {
       setError('Type something like “250 lunch”.');
       return;
     }
+    if (tooMany) {
+      setError(`You can add up to ${MAX_LINES} entries at once.`);
+      return;
+    }
     const bad = lines.find((l) => previews[l] && !previews[l].ok);
     if (bad) {
       setError(`“${bad}”: ${previews[bad].error}`);
@@ -107,13 +120,15 @@ export default function Quick() {
     }
     setSaving(true);
     setError(null);
-    const done: Transaction[] = [];
+    if (!noteId.current) noteId.current = newNoteId();
     try {
-      for (const line of lines) {
-        // The phone's date, so "today" is right even when the server's clock (UTC) is still on yesterday.
-        const res = await api<{ transaction: Transaction }>('/transactions/quick', { body: { q: line, written_on: toISO(new Date()), kind } });
-        done.push(res.transaction);
-      }
+      // All entries in one request: they're saved together, or none if one can't be read.
+      // The phone's date, so "today" is right even when the server's clock (UTC) is still on yesterday.
+      const res = await api<{ transaction: Transaction; transactions?: Transaction[] }>('/transactions/quick', {
+        body: { q: lines.join('\n'), written_on: toISO(new Date()), kind, client_id: noteId.current },
+      });
+      const done = res.transactions?.length ? res.transactions : [res.transaction];
+      noteId.current = null;
       const last = done[done.length - 1];
       updateWidgets({ last: `Saved ${formatMoney(last.amount_cents, user.currency)} · ${last.category}` });
       refreshWidgets(user.currency);
@@ -122,10 +137,8 @@ export default function Quick() {
       setPreviews({});
       if (fromWidget && Platform.OS === 'android') setTimeout(close, 900);
     } catch (err) {
-      // Lines saved before the failure stay saved; show what's left.
-      setText(lines.slice(done.length).join('\n'));
+      // Nothing was saved; the text stays so it can be fixed or sent again.
       setError(errorMessage(err));
-      if (done.length) setSaved(done);
     } finally {
       setSaving(false);
     }
@@ -179,6 +192,7 @@ export default function Quick() {
           onChangeText={(t) => {
             setText(t);
             setError(null);
+            noteId.current = null;
           }}
           autoFocus
           multiline
@@ -204,11 +218,12 @@ export default function Quick() {
           })}
         </View>
 
+        {tooMany ? <Notice tone="warning">{`Up to ${MAX_LINES} entries at once. You have ${allLines.length}.`}</Notice> : null}
         {error ? <Notice tone="critical">{error}</Notice> : null}
 
         <Row>
           <Button title={lines.length > 1 ? `Save ${lines.length}` : 'Save'} icon="check" onPress={save} loading={saving}
-            disabled={!lines.length} style={{ flex: 1 }} />
+            disabled={!lines.length || tooMany} style={{ flex: 1 }} />
           <Button title="Full form" variant="ghost" onPress={() => router.replace('/transaction/new')} />
         </Row>
 

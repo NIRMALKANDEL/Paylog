@@ -81,7 +81,7 @@
             <span class="tx-cat cat-dot" data-kind="{{ r.kind }}">{{ r.category[:1] }}</span>
             <div class="tx-main">
                 <span class="tx-desc">{{ r.description or r.category }}</span>
-                <span class="tx-meta">{{ r.frequency|title }} · due {{ r.next_date }}</span>
+                <span class="tx-meta"><span class="nw">{{ r.frequency|title }}</span> · <span class="nw">due {{ r.next_date }}</span></span>
             </div>
             {{ m.amount(r) }}
         </li>

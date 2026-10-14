@@ -78,6 +78,31 @@ export type Dashboard = {
   insights: Insight[];
   trend: MonthPoint[];
   pace: { days_in_month: number; this_month: number[]; last_month: number[]; budget: number };
+  upcoming?: Rule[]; // recurring items due in the next 7 days (this month's view only)
+};
+
+// Shared expenses (Splitwise-style). Members are names; "You" is the account holder.
+export type SplitGroupSummary = { id: number; name: string; member_count: number; my_net_cents: number };
+export type SplitMember = { id: number; name: string; is_me: boolean; net_cents: number };
+export type SplitExpense = {
+  id: number;
+  description: string;
+  amount_cents: number;
+  date: string;
+  split: 'equal' | 'exact';
+  paid_by: number;
+  my_share_cents: number;
+  shares: { member_id: number; share_cents: number }[];
+};
+export type SplitGroup = {
+  id: number;
+  name: string;
+  my_net_cents: number;
+  total_spent_cents: number;
+  members: SplitMember[];
+  expenses: SplitExpense[];
+  settlements: { id: number; from_member: number; to_member: number; amount_cents: number; date: string }[];
+  suggested: { from_member: number; to_member: number; amount_cents: number }[];
 };
 
 export type QuickPreview = {

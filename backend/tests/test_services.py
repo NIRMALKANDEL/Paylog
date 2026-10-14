@@ -208,3 +208,13 @@ def test_range_insights_mentions_top_category(app, auth_client):
     texts = " ".join(i["text"] for i in insights)
     assert "Rent is your largest spending category at 83%" in texts
     assert "You kept 40% of your income" in texts
+
+
+def test_range_insights_overspending_reads_naturally(app, auth_client):
+    uid = seed(app, [("expense", 15000, "Rent", "2026-09-01"), ("income", 10000, "Salary", "2026-09-01")])
+    with app.app_context():
+        insights = analytics.range_insights(get_db(), uid, date(2026, 9, 1), date(2026, 9, 15),
+                                            lambda c: format_money(c))
+    texts = " ".join(i["text"] for i in insights)
+    assert "You spent 50% more than your income over this period." in texts
+    assert "kept -" not in texts

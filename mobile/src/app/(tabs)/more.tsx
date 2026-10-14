@@ -11,6 +11,7 @@ const LINKS: { href: Href; icon: IconName; title: string; text: string }[] = [
   { href: '/budgets', icon: 'wallet', title: 'Budgets', text: 'Monthly and per-category limits' },
   { href: '/goals', icon: 'target', title: 'Savings goals', text: 'Track what you are saving for' },
   { href: '/recurring', icon: 'repeat', title: 'Recurring', text: 'Rent, salary and subscriptions, added automatically' },
+  { href: '/shared', icon: 'users', title: 'Shared expenses', text: 'Split bills with friends and settle up' },
   { href: '/calculators', icon: 'calc', title: 'Calculators', text: 'Savings growth, goals, emergency fund, loan EMI' },
   { href: '/import', icon: 'upload', title: 'Import CSV', text: 'Bring in transactions from a spreadsheet' },
   { href: '/settings', icon: 'settings', title: 'Settings', text: 'Profile, appearance, security, your data' },
