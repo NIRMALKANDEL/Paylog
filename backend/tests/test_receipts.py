@@ -393,8 +393,9 @@ def test_quick_add_rejects_offsite_next(app, auth_client):
 
 def test_quick_preview(auth_client):
     data = auth_client.get("/transactions/quick/preview?q=250%20swiggy").json
-    assert data == {"ok": True, "kind": "expense", "amount": "₹250", "category": "Food", "date": "2026-09-15",
-                    "is_today": True, "description": "Swiggy", "when": "today"}
+    entry = {"kind": "expense", "amount": "₹250", "category": "Food", "date": "2026-09-15",
+             "is_today": True, "description": "Swiggy", "when": "today"}
+    assert data == {"ok": True, **entry, "count": 1, "entries": [entry]}
     assert auth_client.get("/transactions/quick/preview?q=tea%2020%20yesterday").json["when"] == "yesterday"
     assert auth_client.get("/transactions/quick/preview?q=tea%2020%20on%201%20sep").json["when"] == "Tue 1 Sep"
     assert auth_client.get("/transactions/quick/preview?q=swiggy").json["ok"] is False

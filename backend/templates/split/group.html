@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+
+{% block title %}{{ d.group.name }} — Shared expenses — Paylog{% endblock %}
+
+{% macro balance_text(net, name) -%}
+{%- if net > 0 -%}<span class="amount-income">{{ "are" if name == "You" else "is" }} owed {{ net|money }}</span>
+{%- elif net < 0 -%}<span>{{ "owe" if name == "You" else "owes" }} {{ (-net)|money }}</span>
+{%- else -%}<span class="muted">{{ "are" if name == "You" else "is" }} settled up</span>{%- endif -%}
+{%- endmacro %}
+
+{% block content %}
+{% set members = d.members %}
+<header class="page-head">
+    <div>
+        <p class="eyebrow"><a href="{{ url_for('split.index') }}" class="link">← Shared expenses</a></p>
+        <h1 class="page-title">{{ d.group.name }}</h1>
+    </div>
+</header>
+
+<section class="summary-strip">
+    <div><span class="muted small">Group spending</span><strong>{{ d.total_spent|money }}</strong></div>
+    <div><span class="muted small">{{ "You're owed" if d.my_net > 0 else ("You owe" if d.my_net < 0 else "Your balance") }}</span>
+        <strong class="{{ 'amount-income' if d.my_net > 0 }}">{{ (d.my_net|abs)|money }}</strong></div>
+    <div><span class="muted small">People</span><strong>{{ members|length }}</strong></div>
+</section>
+
+<div class="grid-2 grid-2-wide">
+<div>
+    <section class="card" id="add-expense">
+        <h2 class="card-title">{{ m.icon("plus", 18) }} Add an expense</h2>
+        <form method="POST" action="{{ url_for('split.add_expense', group_id=d.group.id) }}" data-split-form>
+            {{ m.csrf() }}
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="split-amount">Amount ({{ currencies[current_user.currency][0] }})</label>
+                    <input type="text" inputmode="decimal" id="split-amount" name="amount" class="form-input input-amount" placeholder="0.00" autocomplete="off" required>
+                </div>
+                <div class="form-group">
+                    <label for="split-paid-by">Paid by</label>
+                    <select id="split-paid-by" name="paid_by" class="form-input">
+                        {% for item in members %}<option value="{{ item.member.id }}">{{ item.member.name }}</option>{% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="split-description">Description</label>
+                    <input type="text" id="split-description" name="description" class="form-input" maxlength="200" placeholder="e.g. Dinner">
+                </div>
+                <div class="form-group">
+                    <label for="split-date">Date</label>
+                    <input type="date" id="split-date" name="date" value="{{ today }}" class="form-input" required>
+                </div>
+            </div>
+            <fieldset class="segmented" aria-label="How to split">
+                <label><input type="radio" name="split" value="equal" checked><span>Split equally</span></label>
+                <label><input type="radio" name="split" value="exact"><span>Exact amounts</span></label>
+            </fieldset>
+            <div class="form-group" data-split-equal>
+                <span class="muted small">Between</span>
+                {% for item in members %}
+                <label class="checkbox"><input type="checkbox" name="members" value="{{ item.member.id }}" checked> {{ item.member.name }}</label>
+                {% endfor %}
+            </div>
+            <div class="form-group" data-split-exact>
+                <span class="muted small">Each person's share (must add up to the amount)</span>
+                {% for item in members %}
+                <div class="contribute-form split-share">
+                    <label for="share-{{ item.member.id }}" class="grow">{{ item.member.name }}</label>
+                    <input type="text" inputmode="decimal" id="share-{{ item.member.id }}" name="share_{{ item.member.id }}" class="form-input input-sm" placeholder="0" autocomplete="off">
+                </div>
+                {% endfor %}
+            </div>
+            <button type="submit" class="btn-primary">Add expense</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2 class="card-title">Expenses</h2>
+        {% if d.expenses %}
+        <ul class="tx-list">
+            {% for item in d.expenses %}
+            {% set e = item.expense %}
+            <li class="tx-row">
+                <span class="tx-cat cat-dot" data-kind="expense">{{ (e.description or "S")[:1] }}</span>
+                <div class="tx-main">
+                    <span class="tx-desc">{{ e.description or "Shared expense" }}</span>
+                    <span class="tx-meta">{{ item.paid_by_name }} paid · {{ e.date }} ·
+                        {% if e.split == "equal" %}split {{ item.shares|length }} ways{% else %}exact split{% endif %}
+                        {% if d.me %} · your share {{ item.my_share|money }}{% endif %}</span>
+                </div>
+                <span class="amount amount-expense">{{ e.amount_cents|money }}</span>
+                <div class="tx-actions">
+                    <form method="POST" action="{{ url_for('split.delete_expense', group_id=d.group.id, expense_id=e.id) }}" data-confirm="Delete this expense? Balances will be recalculated.">
+                        {{ m.csrf() }}
+                        <button type="submit" class="icon-btn danger" aria-label="Delete expense">{{ m.icon("trash", 16) }}</button>
+                    </form>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty">No expenses yet. Add the first one above.</p>
+        {% endif %}
+    </section>
+</div>
+
+<div>
+    <section class="card">
+        <h2 class="card-title">Balances</h2>
+        {% for item in members %}
+        <div class="bar-list-row"><span>{{ item.member.name }}</span><span class="num">{{ balance_text(item.net, item.member.name) }}</span></div>
+        {% endfor %}
+    </section>
+
+    <section class="card" id="settle">
+        <h2 class="card-title">{{ m.icon("check", 18) }} Settle up</h2>
+        {% if d.plan %}
+        <p class="muted small">The fewest payments that settle everyone:</p>
+        {% for p in d.plan %}
+        <form method="POST" action="{{ url_for('split.settle', group_id=d.group.id) }}" class="bar-list-row settle-row">
+            {{ m.csrf() }}
+            <input type="hidden" name="from_member" value="{{ p.from_member }}">
+            <input type="hidden" name="to_member" value="{{ p.to_member }}">
+            <input type="hidden" name="amount" value="{{ p.amount_cents|as_input }}">
+            <span>{{ p.from_name }} → {{ p.to_name }} <strong class="num">{{ p.amount_cents|money }}</strong></span>
+            <button type="submit" class="btn-ghost btn-sm">Mark paid</button>
+        </form>
+        {% endfor %}
+        <details class="raw-text">
+            <summary class="small">Record a different amount</summary>
+            <form method="POST" action="{{ url_for('split.settle', group_id=d.group.id) }}">
+                {{ m.csrf() }}
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="settle-from">Who paid</label>
+                        <select id="settle-from" name="from_member" class="form-input">
+                            {% for item in members if item.net < 0 %}<option value="{{ item.member.id }}">{{ item.member.name }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="settle-to">To</label>
+                        <select id="settle-to" name="to_member" class="form-input">
+                            {% for item in members if item.net > 0 %}<option value="{{ item.member.id }}">{{ item.member.name }}</option>{% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="settle-amount">Amount</label>
+                        <input type="text" inputmode="decimal" id="settle-amount" name="amount" class="form-input" placeholder="0.00" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="settle-date">Date</label>
+                        <input type="date" id="settle-date" name="date" value="{{ today }}" class="form-input">
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary btn-sm">Record payment</button>
+            </form>
+        </details>
+        {% else %}
+        <p class="empty">Everyone is settled up.</p>
+        {% endif %}
+
+        {% if d.settlements %}
+        <h3 class="card-title small settle-history">Payments made</h3>
+        <ul class="tx-list">
+            {% for item in d.settlements %}
+            {% set s = item.settlement %}
+            <li class="tx-row">
+                <span class="tx-cat cat-dot" data-kind="income">{{ m.icon("check", 14) }}</span>
+                <div class="tx-main">
+                    <span class="tx-desc">{{ item.from_name }} paid {{ item.to_name }}</span>
+                    <span class="tx-meta">{{ s.date }}</span>
+                </div>
+                <span class="amount">{{ s.amount_cents|money }}</span>
+                <div class="tx-actions">
+                    <form method="POST" action="{{ url_for('split.delete_settlement', group_id=d.group.id, settlement_id=s.id) }}" data-confirm="Remove this payment?">
+                        {{ m.csrf() }}
+                        <button type="submit" class="icon-btn danger" aria-label="Remove payment">{{ m.icon("trash", 16) }}</button>
+                    </form>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </section>
+
+    <section class="card" id="people">
+        <h2 class="card-title">{{ m.icon("users", 18) }} People</h2>
+        {% for item in members %}
+        <div class="bar-list-row">
+            <span>{{ item.member.name }}</span>
+            {% if not item.member.is_me %}
+            <form method="POST" action="{{ url_for('split.remove_member', group_id=d.group.id, member_id=item.member.id) }}" data-confirm="Remove {{ item.member.name }} from this group?">
+                {{ m.csrf() }}
+                <button type="submit" class="link small link-danger">Remove</button>
+            </form>
+            {% endif %}
+        </div>
+        {% endfor %}
+        <form method="POST" action="{{ url_for('split.add_member', group_id=d.group.id) }}" class="contribute-form">
+            {{ m.csrf() }}
+            <input type="text" name="name" class="form-input input-sm" maxlength="40" placeholder="Add a person" aria-label="Name of the person to add" required>
+            <button type="submit" class="btn-primary btn-sm">Add</button>
+        </form>
+        <form method="POST" action="{{ url_for('split.rename', group_id=d.group.id) }}" class="contribute-form split-rename">
+            {{ m.csrf() }}
+            <input type="text" name="name" value="{{ d.group.name }}" class="form-input input-sm" maxlength="40" aria-label="Group name" required>
+            <button type="submit" class="btn-ghost btn-sm">Rename</button>
+        </form>
+        <div class="card-foot">
+            <span class="muted small">Deleting removes its expenses and payments.</span>
+            <form method="POST" action="{{ url_for('split.delete', group_id=d.group.id) }}" data-confirm="Delete “{{ d.group.name }}” with all its expenses and payments?">
+                {{ m.csrf() }}
+                <button type="submit" class="link small link-danger">{{ m.icon("trash", 14) }} Delete group</button>
+            </form>
+        </div>
+    </section>
+</div>
+</div>
+{% endblock %}

@@ -25,6 +25,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.io.IOException
+import java.util.UUID
 import java.util.concurrent.Executors
 
 /**
@@ -107,6 +108,8 @@ class QuickNoteActivity : Activity() {
     primary.isEnabled = false
     val writtenOn = Store.today()
     val chosen = kind
+    // One id per line, reused if the line has to be sent again later (see Api.quickAdd).
+    val clientIds = lines.map { UUID.randomUUID().toString() }
     io.execute {
       val ids = mutableListOf<Long>()
       var last: String? = null
@@ -115,12 +118,12 @@ class QuickNoteActivity : Activity() {
       var left = emptyList<String>()
       for ((i, line) in lines.withIndex()) {
         try {
-          val res = Api.quickAdd(this, line, writtenOn, chosen)
+          val res = Api.quickAdd(this, line, writtenOn, chosen, clientIds[i])
           res.optJSONObject("transaction")?.optLong("id")?.let { ids += it }
           last = Notes.describe(res)
         } catch (e: IOException) {
           // No internet: keep the rest on the phone and send them later.
-          Store.enqueue(this, lines.drop(i), writtenOn, chosen)
+          Store.enqueue(this, lines.drop(i), writtenOn, chosen, clientIds.drop(i))
           SyncWorker.schedule(this)
           outcome = Outcome.QUEUED
           break
@@ -207,6 +210,7 @@ class QuickNoteActivity : Activity() {
     val seq = ++previewSeq
     if (line == null || Store.token(this) == null) {
       preview.text = ""
+      preview.visibility = View.GONE
       return
     }
     val chosen = kind
@@ -228,6 +232,7 @@ class QuickNoteActivity : Activity() {
         if (seq != previewSeq || isFinishing || isDestroyed) return@post
         val prefix = if (lines.size > 1) "${lines.size} entries · last: " else ""
         preview.text = if (text.isBlank()) "" else (if (ok) "✓ " else "! ") + prefix + text
+        preview.visibility = if (text.isBlank()) View.GONE else View.VISIBLE
         preview.setTextColor(if (ok) colors.muted else colors.warning)
       }
     }
@@ -319,33 +324,26 @@ class QuickNoteActivity : Activity() {
       elevation = dp(8).toFloat()
     }
 
-    val header = LinearLayout(this).apply {
-      orientation = LinearLayout.HORIZONTAL
-      gravity = Gravity.CENTER_VERTICAL
-    }
-    header.addView(text("Paylog quick note", 14f, colors.accent, bold = true), LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
-    header.addView(text("✕", 18f, colors.muted).apply {
-      contentDescription = "Close"
-      setPadding(dp(10), dp(4), dp(4), dp(4))
-      setOnClickListener { finish() }
-    })
-    card.addView(header)
-
-    // − Debit / + Credit. Untouched, the words decide ("salary 65000" is a credit).
+    // − Debit / + Credit, and close. Untouched, the words decide ("salary 65000" is a credit).
     val direction = LinearLayout(this).apply {
       orientation = LinearLayout.HORIZONTAL
-      setPadding(0, dp(10), 0, dp(2))
+      gravity = Gravity.CENTER_VERTICAL
     }
     debitButton = button("−  Debit", filled = false).apply { setOnClickListener { chooseKind("expense") } }
     creditButton = button("+  Credit", filled = false).apply { setOnClickListener { chooseKind("income") } }
     direction.addView(debitButton, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { marginEnd = dp(8) })
     direction.addView(creditButton, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+    direction.addView(text("✕", 18f, colors.muted).apply {
+      contentDescription = "Close"
+      setPadding(dp(14), dp(6), dp(2), dp(6))
+      setOnClickListener { finish() }
+    })
     debitButton.gravity = Gravity.CENTER
     creditButton.gravity = Gravity.CENTER
     card.addView(direction, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
     input = EditText(this).apply {
-      hint = "250 lunch\n+1200 from Rahul"
+      hint = "250 lunch, 40 tea\n+1200 from Rahul"
       setHintTextColor(colors.faint)
       setTextColor(colors.ink)
       setTextSize(TypedValue.COMPLEX_UNIT_SP, 21f)
@@ -355,7 +353,7 @@ class QuickNoteActivity : Activity() {
       inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
       minLines = 2
       maxLines = 6
-      contentDescription = "Quick note. One transaction per line."
+      contentDescription = "Quick note. One transaction per line, or separate them with commas."
       addTextChangedListener(object : TextWatcher {
         override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
         override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -367,7 +365,7 @@ class QuickNoteActivity : Activity() {
     }
     card.addView(input, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
-    preview = text("e.g. 250 lunch · 2k rent yesterday · salary 65000", 13f, colors.muted)
+    preview = text("", 13f, colors.muted).apply { visibility = View.GONE }
     card.addView(preview)
 
     status = text("", 14f, colors.ink).apply {
@@ -379,9 +377,14 @@ class QuickNoteActivity : Activity() {
     val buttons = LinearLayout(this).apply {
       orientation = LinearLayout.HORIZONTAL
       gravity = Gravity.CENTER_VERTICAL
-      setPadding(0, dp(12), 0, 0)
+      setPadding(0, dp(8), 0, 0)
     }
-    secondary = button("Open app", filled = false).apply { setOnClickListener { openApp() } }
+    secondary = text("Open app", 15f, colors.accent, bold = true).apply {
+      setPadding(dp(4), dp(10), dp(12), dp(10))
+      isClickable = true
+      isFocusable = true
+      setOnClickListener { openApp() }
+    }
     buttons.addView(secondary)
     buttons.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
     primary = button("Save", filled = true).apply { setOnClickListener { save() } }

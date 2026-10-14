@@ -130,7 +130,7 @@ def test_export_csv_escapes_formulas(auth_client):
     assert resp.status_code == 200
     assert resp.mimetype == "text/csv"
     text = resp.data.decode("utf-8-sig")
-    assert text.splitlines()[0] == "date,type,category,amount,description"
+    assert text.splitlines()[0] == "date,type,category,amount,description,time,method,reference"
     assert "99.50" in text
     assert "'=HYPERLINK" in text
 

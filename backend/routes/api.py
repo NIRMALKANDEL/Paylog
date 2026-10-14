@@ -13,7 +13,9 @@ Amounts are integer cents; dates are ISO "YYYY-MM-DD".
 
 import hashlib
 import math
+import re
 import secrets
+import sqlite3
 
 from flask import Blueprint, current_app, g, jsonify, request
 from werkzeug.exceptions import HTTPException
@@ -23,14 +25,14 @@ from database.db import get_db
 from routes import budgets as budgets_routes
 from routes import settings as settings_routes
 from routes import transactions as tx_routes
-from routes.analytics import RANGES, resolve_range
+from routes.analytics import RANGES, report_csv, resolve_range
 from routes.auth import (
     _DUMMY_HASH, first_name, get_user, send_reset_email, send_verification_email, validate_email,
     validate_name, validate_password,
 )
 from routes.goals import MAX_GOALS, describe_goal, get_owned_goal, validate_goal
 from routes.recurring import MAX_RULES, get_owned_rule, monthly_commitments, toggle_rule
-from services import analytics
+from services import analytics, split
 from services.categories import (
     CATEGORIES, CURRENCIES, EXPENSE_CATEGORIES, FREQUENCIES, INCOME_CATEGORIES, MODES, THEMES,
 )
@@ -40,7 +42,7 @@ from services.money import format_money, parse_amount
 from services.receipt_ai import ReceiptAIError, ai_enabled, extract_receipt
 from services.receipt_ocr import OnlineReaderError, ocr_enabled, read_lines
 from services.receipts import MAX_TEXT_LENGTH, parse_receipt_lines, parse_receipt_text
-from services.recurring import run_due
+from services.recurring import run_due, upcoming
 from services.security import email_ip_throttle, email_throttle, login_throttle
 from services.tokens import session_fingerprint
 
@@ -510,6 +512,7 @@ def dashboard():
         goals=[goal_json(describe_goal(r, real_today)) for r in goals],
         insights=analytics.dashboard_insights(db, user, now, fmt_money) if is_current else [],
         trend=trend,
+        upcoming=[rule_json(r) for r in upcoming(db, uid, real_today)] if is_current else [],
         pace={
             "days_in_month": month_end(now).day,
             "this_month": analytics.cumulative_daily(db, uid, this_first, through_day=now.day),
@@ -604,10 +607,9 @@ def delete_transaction(tx_id):
 
 @bp.get("/transactions/quick/preview")
 def quick_preview():
-    clean, error = tx_routes.quick_parse(request.args.get("q", ""), None, request.args.get("kind"))
-    if error:
-        return jsonify(ok=False, error=error)
-    return jsonify(ok=True, **tx_routes.describe_quick(clean))
+    """`q` may hold several entries ("250 lunch, 40 tea"): `entries` lists each one."""
+    return tx_routes.quick_preview_json(*tx_routes.quick_parse_many(request.args.get("q", ""), None,
+                                                                    request.args.get("kind")))
 
 
 def written_day(raw):
@@ -625,20 +627,61 @@ def written_day(raw):
 
 @bp.post("/transactions/quick")
 def quick_add():
-    """One line of text -> a saved transaction. Used by the app and its home-screen widget.
+    """Text -> saved transaction(s). Used by the app and its home-screen widget.
 
+    `q` may hold several entries separated by commas, semicolons or new lines
+    ("250 lunch, 40 tea"); they are saved together, or none if one can't be read.
     Optional `written_on` (YYYY-MM-DD): the day the note was typed, for notes the
     widget saved offline and sends later. The phone's own date also fixes "today"
     when the phone is a day ahead of the server (India just after midnight vs UTC).
+    Optional `client_id`: sending the same note again returns what was saved the
+    first time instead of saving it twice.
     """
     data = body()
-    clean, error = tx_routes.quick_parse(data.get("q", ""), written_day(data.get("written_on")),
-                                         data.get("kind"), data.get("category"))
+    client_id = (data.get("client_id") or "").strip() or None
+    if client_id and not CLIENT_ID.fullmatch(client_id):
+        fail("client_id must be 8-64 letters, digits or dashes.")
+    if client_id and (saved := saved_quick_notes(client_id)):
+        return quick_note_response(saved, 200)  # sent again after a dropped connection
+    cleans, error = tx_routes.quick_parse_many(data.get("q", ""), written_day(data.get("written_on")),
+                                               data.get("kind"), data.get("category"))
     if error:
         fail(error)
-    tx_id = tx_routes.insert_transaction(g.user["id"], clean)
-    return jsonify(ok=True, transaction=tx_json(tx_routes.get_owned_transaction(tx_id)),
-                   **tx_routes.describe_quick(clean)), 201
+    for i, clean in enumerate(cleans):
+        clean["client_id"] = quick_client_ids(client_id)[i] if client_id else None
+    try:
+        ids = tx_routes.insert_transactions(g.user["id"], cleans)
+    except sqlite3.IntegrityError:
+        get_db().rollback()
+        saved = saved_quick_notes(client_id) if client_id else None
+        if not saved:
+            raise
+        return quick_note_response(saved, 200)  # the same note arrived twice at once
+    return quick_note_response([tx_routes.get_owned_transaction(i) for i in ids], 201)
+
+
+CLIENT_ID = re.compile(r"[A-Za-z0-9-]{8,64}")
+
+
+def quick_client_ids(client_id):
+    """The note's id for its first entry, then "<id>-1", "<id>-2"... for the others."""
+    return [client_id] + [f"{client_id}-{i}" for i in range(1, tx_routes.MAX_QUICK_ENTRIES)]
+
+
+def saved_quick_notes(client_id):
+    ids = quick_client_ids(client_id)
+    return get_db().execute(
+        f"SELECT * FROM transactions WHERE user_id = ? AND client_id IN ({', '.join('?' * len(ids))}) ORDER BY id",
+        (g.user["id"], *ids),
+    ).fetchall()
+
+
+def quick_note_response(rows, status):
+    """The first entry's fields at the top level (older app versions read those), plus every entry."""
+    cleans = [{k: row[k] for k in ("kind", "amount_cents", "category", "date", "description")} for row in rows]
+    return jsonify(ok=True, transaction=tx_json(rows[0]), transactions=[tx_json(r) for r in rows],
+                   count=len(rows), entries=[tx_routes.describe_quick(c) for c in cleans],
+                   **tx_routes.describe_quick(cleans[0])), status
 
 
 @bp.get("/transactions/export.csv")
@@ -757,6 +800,13 @@ def analytics_view():
         heat_keys=keys[-6:],
         by_category_month=analytics.category_by_month(db, uid, keys[-6:]),
     )
+
+
+@bp.get("/analytics/report.csv")
+def analytics_report():
+    db = get_db()
+    _, start, end = resolve_range(request.args, db, g.user["id"], today())
+    return report_csv(db, g.user["id"], start, end)
 
 
 @bp.get("/calculators")
@@ -951,3 +1001,138 @@ def delete_recurring(rule_id):
     db.commit()
     return jsonify(ok=True, **recurring_payload())
 
+
+
+# ------------------------------------------------------------------ #
+# Shared expenses (Splitwise-style)                                   #
+# ------------------------------------------------------------------ #
+
+def owned_split_group(group_id):
+    group = split.get_group(get_db(), g.user["id"], group_id)
+    if group is None:
+        fail("Not found.", 404)
+    return group
+
+
+def split_group_json(detail):
+    grp = detail["group"]
+    return {
+        "id": grp["id"],
+        "name": grp["name"],
+        "my_net_cents": detail["my_net"],
+        "total_spent_cents": detail["total_spent"],
+        "members": [{"id": m["member"]["id"], "name": m["member"]["name"], "is_me": bool(m["member"]["is_me"]),
+                     "net_cents": m["net"]} for m in detail["members"]],
+        "expenses": [{"id": e["expense"]["id"], "description": e["expense"]["description"],
+                      "amount_cents": e["expense"]["amount_cents"], "date": e["expense"]["date"],
+                      "split": e["expense"]["split"], "paid_by": e["expense"]["paid_by"],
+                      "my_share_cents": e["my_share"],
+                      "shares": [{"member_id": s["member_id"], "share_cents": s["share_cents"]} for s in e["shares"]]}
+                     for e in detail["expenses"]],
+        "settlements": [{"id": s["settlement"]["id"], "from_member": s["settlement"]["from_member"],
+                         "to_member": s["settlement"]["to_member"], "amount_cents": s["settlement"]["amount_cents"],
+                         "date": s["settlement"]["date"]} for s in detail["settlements"]],
+        "suggested": [{"from_member": p["from_member"], "to_member": p["to_member"], "amount_cents": p["amount_cents"]}
+                      for p in detail["plan"]],
+    }
+
+
+def split_group_payload(group_id, status=200):
+    group = owned_split_group(group_id)
+    return jsonify(ok=True, group=split_group_json(split.group_detail(get_db(), group))), status
+
+
+@bp.get("/shared/groups")
+def list_split_groups():
+    return jsonify(groups=[{"id": i["group"]["id"], "name": i["group"]["name"], "member_count": i["member_count"],
+                            "my_net_cents": i["my_net"]} for i in split.list_groups(get_db(), g.user["id"])])
+
+
+@bp.post("/shared/groups")
+def create_split_group():
+    data = body()
+    members = data.get("members") or []
+    if not isinstance(members, list):
+        fail("members must be a list of names.")
+    group_id, error = split.create_group(get_db(), g.user["id"], data.get("name"), members)
+    if error:
+        fail(error)
+    return split_group_payload(group_id, 201)
+
+
+@bp.get("/shared/groups/<int:group_id>")
+def get_split_group(group_id):
+    return split_group_payload(group_id)
+
+
+@bp.patch("/shared/groups/<int:group_id>")
+def rename_split_group(group_id):
+    if error := split.rename_group(get_db(), owned_split_group(group_id), body().get("name")):
+        fail(error)
+    return split_group_payload(group_id)
+
+
+@bp.delete("/shared/groups/<int:group_id>")
+def delete_split_group(group_id):
+    split.delete_group(get_db(), owned_split_group(group_id))
+    return jsonify(ok=True)
+
+
+@bp.post("/shared/groups/<int:group_id>/members")
+def add_split_member(group_id):
+    _, error = split.add_member(get_db(), owned_split_group(group_id), body().get("name"))
+    if error:
+        fail(error)
+    return split_group_payload(group_id, 201)
+
+
+@bp.delete("/shared/groups/<int:group_id>/members/<int:member_id>")
+def remove_split_member(group_id, member_id):
+    if error := split.remove_member(get_db(), owned_split_group(group_id), member_id):
+        fail(error)
+    return split_group_payload(group_id)
+
+
+@bp.post("/shared/groups/<int:group_id>/expenses")
+def add_split_expense(group_id):
+    group = owned_split_group(group_id)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        fail("Send a JSON object.")
+    shares = data.get("shares") or {}
+    members = data.get("members") or []
+    if not isinstance(shares, dict) or not isinstance(members, list):
+        fail("members must be a list of ids and shares an object of id: amount.")
+    _, error = split.add_expense(
+        get_db(), group, data.get("paid_by"), None if data.get("amount") is None else str(data.get("amount")),
+        data.get("description"), data.get("date") or today().isoformat(), data.get("split") or "equal",
+        members, {k: None if v is None else str(v) for k, v in shares.items()},
+    )
+    if error:
+        fail(error)
+    return split_group_payload(group_id, 201)
+
+
+@bp.delete("/shared/groups/<int:group_id>/expenses/<int:expense_id>")
+def delete_split_expense(group_id, expense_id):
+    if not split.delete_expense(get_db(), owned_split_group(group_id), expense_id):
+        fail("Not found.", 404)
+    return split_group_payload(group_id)
+
+
+@bp.post("/shared/groups/<int:group_id>/settlements")
+def add_split_settlement(group_id):
+    data = body()
+    _, error = split.record_settlement(get_db(), owned_split_group(group_id), data.get("from_member"),
+                                       data.get("to_member"), data.get("amount"),
+                                       data.get("date") or today().isoformat())
+    if error:
+        fail(error)
+    return split_group_payload(group_id, 201)
+
+
+@bp.delete("/shared/groups/<int:group_id>/settlements/<int:settlement_id>")
+def delete_split_settlement(group_id, settlement_id):
+    if not split.delete_settlement(get_db(), owned_split_group(group_id), settlement_id):
+        fail("Not found.", 404)
+    return split_group_payload(group_id)

@@ -12,7 +12,7 @@ from database.db import get_db
 from services.categories import CATEGORIES, EXPENSE_CATEGORIES, INCOME_CATEGORIES, KINDS
 from services.dates import MIN_DATE, parse_date, parse_optional_date, today
 from services.money import cents_to_input, format_money, parse_amount
-from services.quickadd import parse_quick
+from services.quickadd import parse_quick, split_entries
 from services.security import login_required, safe_next_url
 
 bp = Blueprint("transactions", __name__, url_prefix="/transactions")
@@ -72,22 +72,39 @@ def validate_transaction(data):
 
 def insert_transaction(user_id, clean):
     """Save a validated transaction and return its id."""
+    return insert_transactions(user_id, [clean])[0]
+
+
+def insert_transactions(user_id, cleans):
+    """Save validated transactions together (all or none) and return their ids."""
     db = get_db()
-    cur = db.execute(
-        "INSERT INTO transactions (user_id, kind, amount_cents, category, date, description, reference, time, method)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (user_id, clean["kind"], clean["amount_cents"], clean["category"], clean["date"],
-         clean["description"], clean.get("reference"), clean.get("time"), clean.get("method")),
-    )
+    ids = [_insert(db, user_id, clean) for clean in cleans]
     db.commit()
+    return ids
+
+
+def _insert(db, user_id, clean):
+    cur = db.execute(
+        "INSERT INTO transactions (user_id, kind, amount_cents, category, date, description, reference, time, method,"
+        " client_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (user_id, clean["kind"], clean["amount_cents"], clean["category"], clean["date"],
+         clean["description"], clean.get("reference"), clean.get("time"), clean.get("method"), clean.get("client_id")),
+    )
     return cur.lastrowid
 
 
-def offer_undo(tx_id, clean):
+def offer_undo(tx_ids, cleans):
     """Show the "Saved … Undo · Edit" bar on the next page."""
+    if len(cleans) > 1:
+        totals = {kind: sum(c["amount_cents"] for c in cleans if c["kind"] == kind) for kind in KINDS}
+        parts = [f"{format_money(totals['expense'], g.user['currency'])} debit" if totals["expense"] else None,
+                 f"{format_money(totals['income'], g.user['currency'])} credit" if totals["income"] else None]
+        session["undo"] = {"ids": tx_ids, "text": f"Saved {len(cleans)} entries · " + " · ".join(p for p in parts if p)}
+        return
+    clean = cleans[0]
     parts = [format_money(clean["amount_cents"], g.user["currency"]), clean["description"] or None, clean["category"]]
     label = " · ".join(p for p in parts if p)
-    session["undo"] = {"id": tx_id, "text": f"{'Income' if clean['kind'] == 'income' else 'Saved'} {label}"}
+    session["undo"] = {"id": tx_ids[0], "text": f"{'Income' if clean['kind'] == 'income' else 'Saved'} {label}"}
 
 
 def find_duplicate(user_id, reference):
@@ -245,10 +262,10 @@ def edit(tx_id):
             return render_form(tx=tx, form=request.form, error=error, status=400)
         db = get_db()
         db.execute(
-            "UPDATE transactions SET kind = ?, amount_cents = ?, category = ?, date = ?, description = ?"
-            " WHERE id = ? AND user_id = ?",
+            "UPDATE transactions SET kind = ?, amount_cents = ?, category = ?, date = ?, description = ?,"
+            " time = ?, method = ? WHERE id = ? AND user_id = ?",
             (clean["kind"], clean["amount_cents"], clean["category"], clean["date"],
-             clean["description"], tx_id, g.user["id"]),
+             clean["description"], clean["time"], clean["method"], tx_id, g.user["id"]),
         )
         db.commit()
         flash("Transaction updated.", "success")
@@ -281,6 +298,10 @@ def csv_safe(value):
     return text
 
 
+# The first five are what the import needs; time, method and reference come back on import too.
+EXPORT_COLUMNS = ["date", "type", "category", "amount", "description", "time", "method", "reference"]
+
+
 @bp.route("/export.csv")
 @login_required
 def export_csv():
@@ -291,10 +312,11 @@ def export_csv():
     ).fetchall()
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["date", "type", "category", "amount", "description"])
+    writer.writerow(EXPORT_COLUMNS)
     for r in rows:
         writer.writerow([r["date"], r["kind"], r["category"], cents_to_input(r["amount_cents"]),
-                         csv_safe(r["description"])])
+                         csv_safe(r["description"]), r["time"] or "", csv_safe(r["method"] or ""),
+                         r["reference"] or ""])
     filename = f"paylog-transactions-{today().isoformat()}.csv"
     return Response(
         "﻿" + buffer.getvalue(),  # BOM so Excel opens UTF-8 (₹) correctly
@@ -349,9 +371,13 @@ def parse_import(text):
             break
         row = {(k or "").strip().lower(): (v or "").strip() for k, v in raw.items() if k}
         row["kind"] = row.get("type") or row.get("kind") or "expense"
-        description = row.get("description", "")
-        if description.startswith("'") and description[1:2] in ("=", "+", "-", "@"):
-            row["description"] = description[1:]
+        for key in ("description", "method"):  # undo csv_safe's quote
+            value = row.get(key, "")
+            if value.startswith("'") and value[1:2] in ("=", "+", "-", "@"):
+                row[key] = value[1:]
+        # Spreadsheets often rewrite 09:05 as 9:05 or 09:05:00.
+        if (clock := re.fullmatch(r"(\d{1,2}):(\d{2})(?::\d{2})?", row.get("time", ""))):
+            row["time"] = f"{int(clock.group(1)):02d}:{clock.group(2)}"
         clean, error = validate_transaction(row)
         if error:
             errors.append(f"Row {line_no}: {error}")
@@ -365,10 +391,10 @@ def parse_import(text):
 def save_import(user_id, clean_rows):
     db = get_db()
     db.executemany(
-        "INSERT INTO transactions (user_id, kind, amount_cents, category, date, description)"
-        " VALUES (?, ?, ?, ?, ?, ?)",
-        [(user_id, r["kind"], r["amount_cents"], r["category"], r["date"], r["description"])
-         for r in clean_rows],
+        "INSERT INTO transactions (user_id, kind, amount_cents, category, date, description, time, method, reference)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [(user_id, r["kind"], r["amount_cents"], r["category"], r["date"], r["description"],
+          r["time"], r["method"], r["reference"]) for r in clean_rows],
     )
     db.commit()
 
@@ -376,6 +402,29 @@ def save_import(user_id, clean_rows):
 # ------------------------------------------------------------------ #
 # Quick add                                                           #
 # ------------------------------------------------------------------ #
+
+MAX_QUICK_ENTRIES = 20
+
+
+def quick_parse_many(text, written_on=None, kind=None, category=None):
+    """Several entries separated by commas, semicolons or new lines -> (list of clean, error).
+
+    All or nothing: if one entry can't be read, the error names it and nothing is saved.
+    """
+    entries = split_entries(text)
+    if len(entries) <= 1:
+        clean, error = quick_parse(entries[0] if entries else text, written_on, kind, category)
+        return ([clean] if clean else None), error
+    if len(entries) > MAX_QUICK_ENTRIES:
+        return None, f"Add up to {MAX_QUICK_ENTRIES} entries at a time."
+    cleans = []
+    for entry in entries:
+        clean, error = quick_parse(entry, written_on, kind, category)
+        if error:
+            return None, f"“{entry}”: {error}"
+        cleans.append(clean)
+    return cleans, None
+
 
 def quick_parse(text, written_on=None, kind=None, category=None):
     """`written_on` anchors "yesterday"/"monday" to the day a note was typed
@@ -406,19 +455,41 @@ def describe_quick(clean):
 @login_required
 def quick_add():
     back = safe_back(url_for("main.dashboard"))
-    clean, error = quick_parse(request.form.get("q", ""))
+    cleans, error = quick_parse_many(request.form.get("q", ""))
     if error:
         flash(error, "error")
         return redirect(back)
-    offer_undo(insert_transaction(g.user["id"], clean), clean)
+    offer_undo(insert_transactions(g.user["id"], cleans), cleans)
     return redirect(back)
+
+
+@bp.route("/undo", methods=["POST"])
+@login_required
+def undo_many():
+    """Undo for several quick entries saved together (one entry uses the delete route)."""
+    ids = [int(x) for x in request.form.getlist("ids") if x.isdigit()][:MAX_QUICK_ENTRIES]
+    removed = 0
+    if ids:
+        db = get_db()
+        removed = db.execute(
+            f"DELETE FROM transactions WHERE user_id = ? AND id IN ({', '.join('?' * len(ids))})",
+            [g.user["id"], *ids],
+        ).rowcount
+        db.commit()
+    flash(f"Undone. {removed} transaction{'s' if removed != 1 else ''} removed.", "success")
+    return redirect(safe_back(url_for("transactions.index")))
+
+
+def quick_preview_json(cleans, error):
+    """Preview payload: the first entry's fields (older clients), plus every entry."""
+    if error:
+        return jsonify(ok=False, error=error)
+    return jsonify(ok=True, count=len(cleans), entries=[describe_quick(c) for c in cleans],
+                   **describe_quick(cleans[0]))
 
 
 @bp.route("/quick/preview")
 @login_required
 def quick_preview():
     """What a quick entry would save, shown live under the box as you type."""
-    clean, error = quick_parse(request.args.get("q", ""))
-    if error:
-        return jsonify(ok=False, error=error)
-    return jsonify(ok=True, **describe_quick(clean))
+    return quick_preview_json(*quick_parse_many(request.args.get("q", "")))

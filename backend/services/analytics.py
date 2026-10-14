@@ -258,6 +258,18 @@ def dashboard_insights(db, user, today, fmt):
     over = [b["category"] for b in status["categories"] if b["percent"] >= 100]
     if over:
         insights.append({"tone": "critical", "text": f"Over budget in {', '.join(over)}."})
+    near = [b for b in status["categories"] if 85 <= b["percent"] < 100]
+    if near:
+        parts = [f"{b['category']} ({fmt(b['remaining'])} left)" for b in near]
+        insights.append({"tone": "warning", "text": f"Close to your budget in {', '.join(parts)}."})
+    overall = status["overall"]
+    if overall and overall["percent"] >= 100:
+        insights.append({"tone": "critical",
+                         "text": f"You've spent {fmt(-overall['remaining'])} more than your monthly budget."})
+    elif overall and overall["percent"] >= 85:
+        insights.append({"tone": "warning",
+                         "text": f"{overall['percent']:.0f}% of your monthly budget is used; "
+                                 f"{fmt(overall['remaining'])} left."})
 
     last_month = totals(db, uid, prev_first, month_end(prev_first))
     if last_month["savings_rate"] is not None:

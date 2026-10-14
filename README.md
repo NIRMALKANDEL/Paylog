@@ -40,6 +40,12 @@ a home-screen widget, sign-ins that last 30 days, and no demo data.
   reference are filled in. You see a review card and tap **Save** or **Edit**; nothing is saved without you. If the
   amount can't be read, Paylog says so and offers an optional free online reader (OCR.space) or manual entry.
   Already-saved payments (same UPI reference, or same amount and day) are flagged.
+- **Shared expenses (Splitwise-style):** groups with friends (they don't need an account), equal or exact
+  splits, live balances, a fewest-payments "settle up" plan, and recorded repayments. Kept separate from your own
+  transactions. Website and API (`/api/v1/shared/...`); not in the mobile app yet.
+- **Reports:** CSV export of transactions (with time, payment method and UPI reference; re-importable) and a period
+  report CSV from Analytics. Printing a page (Save as PDF) uses a print-friendly layout.
+- **Reminders:** recurring items due in the next 7 days show on the dashboard, plus warnings when a budget is 85% used.
 - **− Debit / + Credit:** every transaction carries a direction flag. Totals for each are shown separately, by month.
 - **Design:** light / dark / system, 6 colour themes, 7 currencies (₹ with Indian grouping).
 
@@ -76,6 +82,8 @@ npx expo lint                         # lint
 ```
 
 Build an Android APK (needs Java 21 + Android SDK; see `mobile/BUILD.md`).
+
+"Today" (default dates, month boundaries) uses India time. Set `APP_TIMEZONE` (e.g. `Asia/Kathmandu`) to change it.
 
 ## Deploy the server
 

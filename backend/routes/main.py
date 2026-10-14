@@ -4,6 +4,7 @@ from database.db import get_db
 from services import analytics
 from services.dates import add_months, last_n_month_keys, month_end, month_start, today
 from services.money import format_money
+from services.recurring import upcoming
 from services.security import login_required
 
 bp = Blueprint("main", __name__)
@@ -72,6 +73,7 @@ def dashboard():
         chart_data=chart_data,
         month_name=now.strftime("%B %Y"),
         status_for=analytics.status_for,
+        upcoming=upcoming(db, uid, now),
     )
 
 

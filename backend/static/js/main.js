@@ -114,6 +114,32 @@
         });
     });
 
+    // Shared expenses: show the "split equally" or the "exact amounts" fields.
+    $$("[data-split-form]").forEach(function (form) {
+        var show = function () {
+            var checked = $('input[name="split"]:checked', form);
+            var exact = checked && checked.value === "exact";
+            $$("[data-split-equal]", form).forEach(function (el) { el.hidden = exact; });
+            $$("[data-split-exact]", form).forEach(function (el) { el.hidden = !exact; });
+        };
+        $$('input[name="split"]', form).forEach(function (r) { r.addEventListener("change", show); });
+        show();
+    });
+
+    // A second tap while a form is still sending would save it twice: ignore it.
+    // (Buttons aren't disabled, so a clicked button's name/value is still sent.)
+    $$('form[method="POST"], form[method="post"]').forEach(function (form) {
+        form.addEventListener("submit", function (e) {
+            if (e.defaultPrevented) return;
+            if (form.getAttribute("data-submitting")) { e.preventDefault(); return; }
+            form.setAttribute("data-submitting", "1");
+        });
+    });
+    // Coming back with the browser's Back button: the forms can be used again.
+    window.addEventListener("pageshow", function () {
+        $$("form[data-submitting]").forEach(function (form) { form.removeAttribute("data-submitting"); });
+    });
+
     // ---------------------------------------------------------------- //
     // Flash messages                                                    //
     // ---------------------------------------------------------------- //
@@ -260,9 +286,20 @@
         var hint = preview.textContent;
         var timer = null, seq = 0;
 
+        function describe(entry) {
+            return (entry.kind === "income" ? "+ " : "− ") + entry.amount + " " + entry.category +
+                (entry.description ? " · " + entry.description : "");
+        }
+
         function show(data) {
             preview.classList.toggle("quick-error", !data.ok);
             if (!data.ok) { preview.textContent = data.error; return; }
+            if (data.count > 1) {
+                // "250 lunch, 40 tea": every entry, then one Enter saves them all.
+                preview.textContent = data.count + " entries: " + data.entries.map(describe).join(", ") +
+                    "  ↵ to save all";
+                return;
+            }
             var when = data.when || data.date;
             preview.textContent = (data.kind === "income" ? "+ Credit " : "− Debit ") + data.amount + " · " + data.category +
                 (data.description ? " · " + data.description : "") + " · " + when + "  ↵ to save";

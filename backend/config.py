@@ -44,6 +44,9 @@ def default_database():
 class Config:
     DATABASE = os.environ.get("DATABASE_PATH") or default_database()
     PRODUCTION = _env_flag("PRODUCTION")
+    # "Today" for dates and month boundaries. Servers run on UTC, which is still the
+    # previous day in India until 5:30 am.
+    APP_TIMEZONE = os.environ.get("APP_TIMEZONE", "Asia/Kolkata")
 
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"

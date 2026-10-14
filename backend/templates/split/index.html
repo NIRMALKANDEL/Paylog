@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+
+{% block title %}Shared expenses — Paylog{% endblock %}
+
+{% block content %}
+<header class="page-head">
+    <div>
+        <p class="eyebrow">Split with friends</p>
+        <h1 class="page-title">Shared expenses</h1>
+    </div>
+</header>
+
+{% set owed = groups|selectattr("my_net", "gt", 0)|sum(attribute="my_net") %}
+{% set owe = groups|selectattr("my_net", "lt", 0)|sum(attribute="my_net") %}
+{% if groups %}
+<section class="stat-grid stat-grid-3">
+    <div class="stat-card is-credit"><span class="stat-label">You're owed</span><span class="stat-value">{{ owed|money }}</span></div>
+    <div class="stat-card is-debit"><span class="stat-label">You owe</span><span class="stat-value">{{ (-owe)|money }}</span></div>
+    <div class="stat-card"><span class="stat-label">Groups</span><span class="stat-value">{{ groups|length }}</span><span class="stat-delta muted">kept apart from your own transactions</span></div>
+</section>
+{% endif %}
+
+<div class="goal-grid">
+    {% for item in groups %}
+    {% set grp = item.group %}
+    <article class="card goal-card">
+        <div class="card-head">
+            <h2 class="card-title"><a href="{{ url_for('split.group', group_id=grp.id) }}" class="link">{{ grp.name }}</a></h2>
+            <span class="muted small">{{ item.member_count }} people</span>
+        </div>
+        <div class="goal-figures">
+            {% if item.my_net > 0 %}<span class="goal-saved amount-income">{{ item.my_net|money }}</span><span class="muted">you're owed</span>
+            {% elif item.my_net < 0 %}<span class="goal-saved">{{ (-item.my_net)|money }}</span><span class="muted">you owe</span>
+            {% else %}<span class="muted">All settled up</span>{% endif %}
+        </div>
+        <div class="card-foot">
+            <a href="{{ url_for('split.group', group_id=grp.id) }}" class="link small">Open group →</a>
+        </div>
+    </article>
+    {% endfor %}
+
+    <section class="card goal-card goal-new">
+        <h2 class="card-title">{{ m.icon("plus", 18) }} New group</h2>
+        {% if not groups %}<p class="muted small">Trips, flatmates, dinners: add who's in, log who paid, and Paylog works out who owes whom. Friends don't need an account.</p>{% endif %}
+        {% if error %}<div class="auth-error" role="alert">{{ error }}</div>{% endif %}
+        <form method="POST" action="{{ url_for('split.index') }}">
+            {{ m.csrf() }}
+            <div class="form-group">
+                <label for="group-name">Group name</label>
+                <input type="text" id="group-name" name="name" value="{{ form.name or '' }}" class="form-input" maxlength="40" placeholder="e.g. Goa trip" required>
+            </div>
+            <div class="form-group">
+                <label for="group-members">Who else is in it?</label>
+                <textarea id="group-members" name="members" class="form-input" rows="3" placeholder="Rahul, Priya, Sam" required>{{ form.members or '' }}</textarea>
+                <span class="muted small">Separate names with commas. You're added automatically.</span>
+            </div>
+            <button type="submit" class="btn-primary">Create group</button>
+        </form>
+    </section>
+</div>
+{% endblock %}

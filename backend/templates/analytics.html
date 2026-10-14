@@ -9,6 +9,10 @@
         <p class="eyebrow">{{ start.strftime("%d %b %Y") }} – {{ end.strftime("%d %b %Y") }}</p>
         <h1 class="page-title">Spending analysis</h1>
     </div>
+    <div class="page-actions">
+        <a href="{{ url_for('analytics.report', range=range_key, start=start.isoformat() if range_key == 'custom' else None, end=end.isoformat() if range_key == 'custom' else None) }}"
+           class="btn-ghost btn-sm">{{ m.icon("download", 16) }} Export report</a>
+    </div>
 </header>
 
 <nav class="range-tabs" aria-label="Time range">
