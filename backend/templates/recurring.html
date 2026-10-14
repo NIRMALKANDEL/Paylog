@@ -27,7 +27,7 @@
                 <span class="tx-cat cat-dot" data-kind="{{ r.kind }}">{{ r.category[:1] }}</span>
                 <div class="tx-main">
                     <span class="tx-desc">{{ r.description or r.category }}</span>
-                    <span class="tx-meta">{{ r.frequency|title }} · {{ r.category }} · {% if r.active %}next {{ r.next_date }}{% else %}paused{% endif %}</span>
+                    <span class="tx-meta"><span class="nw">{{ r.frequency|title }}</span> · <span class="nw">{{ r.category }}</span> · {% if r.active %}<span class="nw">next {{ r.next_date }}</span>{% else %}paused{% endif %}</span>
                 </div>
                 {{ m.amount(r) }}
                 <div class="tx-actions">

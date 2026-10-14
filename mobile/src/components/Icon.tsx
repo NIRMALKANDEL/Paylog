@@ -37,6 +37,7 @@ const ICONS: Record<string, Shape[]> = {
   mail: [['r', 3, 5, 18, 14, 2], ['p', 'M3 7l9 6 9-6']],
   lock: [['r', 5, 11, 14, 10, 2], ['p', 'M8 11V7a4 4 0 0 1 8 0v4']],
   user: [['c', 12, 8, 4], ['p', 'M4 21a8 8 0 0 1 16 0']],
+  users: [['c', 9, 8, 3.5], ['p', 'M2.5 20a6.5 6.5 0 0 1 13 0'], ['p', 'M16 4.6a3.5 3.5 0 0 1 0 6.8'], ['p', 'M18.5 14.2A6.5 6.5 0 0 1 21.5 20']],
 };
 
 export type IconName = keyof typeof ICONS;

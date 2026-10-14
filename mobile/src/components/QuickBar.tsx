@@ -15,7 +15,7 @@ export function QuickBar() {
           borderWidth: 1, borderColor: colors.glassBorder, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 13,
           opacity: pressed ? 0.7 : 1 })}>
         <Icon name="edit" size={18} color={colors.accentText} />
-        <Text style={{ color: colors.faint, fontSize: 15, flex: 1 }} numberOfLines={1}>Type “250 lunch” or “+1200 from Rahul”</Text>
+        <Text style={{ color: colors.faint, fontSize: 15, flex: 1 }} numberOfLines={1}>Type “250 lunch, 40 tea”</Text>
       </Pressable>
       <Pressable onPress={() => router.push('/scan')} accessibilityRole="button" accessibilityLabel="Scan a receipt"
         style={({ pressed }) => ({ backgroundColor: colors.accent, borderRadius: 16, padding: 13, opacity: pressed ? 0.8 : 1,

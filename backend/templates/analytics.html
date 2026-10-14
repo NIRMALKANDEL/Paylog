@@ -115,7 +115,7 @@
             {% for tx in top %}
             <li class="tx-row">
                 <span class="rank">{{ loop.index }}</span>
-                <div class="tx-main"><span class="tx-desc">{{ tx.description or tx.category }}</span><span class="tx-meta">{{ tx.category }} · {{ tx.date }}</span></div>
+                <div class="tx-main"><span class="tx-desc">{{ tx.description or tx.category }}</span><span class="tx-meta"><span class="nw">{{ tx.category }}</span> · <span class="nw">{{ tx.date }}</span></span></div>
                 <span class="amount amount-expense">{{ tx.amount_cents|money }}</span>
             </li>
             {% endfor %}

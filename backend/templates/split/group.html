@@ -86,9 +86,9 @@
                 <span class="tx-cat cat-dot" data-kind="expense">{{ (e.description or "S")[:1] }}</span>
                 <div class="tx-main">
                     <span class="tx-desc">{{ e.description or "Shared expense" }}</span>
-                    <span class="tx-meta">{{ item.paid_by_name }} paid · {{ e.date }} ·
-                        {% if e.split == "equal" %}split {{ item.shares|length }} ways{% else %}exact split{% endif %}
-                        {% if d.me %} · your share {{ item.my_share|money }}{% endif %}</span>
+                    <span class="tx-meta"><span class="nw">{{ item.paid_by_name }} paid</span> · <span class="nw">{{ e.date }}</span> ·
+                        <span class="nw">{% if e.split == "equal" %}split {{ item.shares|length }} ways{% else %}exact split{% endif %}</span>{% if d.me %} ·
+                        <span class="nw">your share {{ item.my_share|money }}</span>{% endif %}</span>
                 </div>
                 <span class="amount amount-expense">{{ e.amount_cents|money }}</span>
                 <div class="tx-actions">
@@ -214,7 +214,7 @@
             <span class="muted small">Deleting removes its expenses and payments.</span>
             <form method="POST" action="{{ url_for('split.delete', group_id=d.group.id) }}" data-confirm="Delete “{{ d.group.name }}” with all its expenses and payments?">
                 {{ m.csrf() }}
-                <button type="submit" class="link small link-danger">{{ m.icon("trash", 14) }} Delete group</button>
+                <button type="submit" class="link small link-danger nw">{{ m.icon("trash", 14) }} Delete group</button>
             </form>
         </div>
     </section>

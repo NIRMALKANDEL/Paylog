@@ -341,3 +341,30 @@
         observer.observe(el);
     });
 })();
+
+// Big figures (stat tiles, summary strips) stay on one line: when an amount is
+// too wide for its tile, its font is shrunk until it fits instead of the number
+// breaking across lines ("₹12,68,653." / "89").
+(function () {
+    "use strict";
+    var items = Array.prototype.slice.call(document.querySelectorAll(".stat-value, .summary-strip strong"));
+    if (!items.length) return;
+    function fit() {
+        items.forEach(function (el) {
+            el.style.fontSize = "";
+            el.classList.add("js-fit");
+            var size = parseFloat(getComputedStyle(el).fontSize);
+            while (el.scrollWidth > el.clientWidth + 1 && size > 13) {
+                size -= 1;
+                el.style.fontSize = size + "px";
+            }
+        });
+    }
+    fit();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+    var timer;
+    window.addEventListener("resize", function () {
+        clearTimeout(timer);
+        timer = setTimeout(fit, 120);
+    });
+})();
