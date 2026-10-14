@@ -1,7 +1,7 @@
 """Date helpers. Dates are stored as ISO strings (YYYY-MM-DD)."""
 
 import calendar
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 MIN_DATE = date(2000, 1, 1)
 
@@ -84,11 +84,31 @@ def inclusive_days(start, end):
     return (end - start).days + 1
 
 
+# Used when the IANA time zone database isn't installed (Windows without the
+# tzdata package). These zones have no daylight saving, so a fixed offset is exact.
+_FIXED_OFFSETS = {"Asia/Kolkata": 330, "Asia/Calcutta": 330, "Asia/Kathmandu": 345, "UTC": 0}
+
+
+def app_timezone(name):
+    """tzinfo for a zone name like "Asia/Kolkata"; UTC if it can't be resolved."""
+    try:
+        from zoneinfo import ZoneInfo
+
+        return ZoneInfo(name)
+    except Exception:  # unknown name or no tz database on this machine
+        return timezone(timedelta(minutes=_FIXED_OFFSETS.get(name, 0)))
+
 
 def today():
-    """Today's date; tests pin it with app.config["FIXED_TODAY"]."""
+    """Today's date in the app's time zone (APP_TIMEZONE, India by default).
+
+    Servers usually run on UTC, which is still "yesterday" in India until 5:30 am.
+    Tests pin the date with app.config["FIXED_TODAY"].
+    """
     from flask import current_app, has_app_context
 
-    if has_app_context() and current_app.config.get("FIXED_TODAY"):
-        return current_app.config["FIXED_TODAY"]
+    if has_app_context():
+        if current_app.config.get("FIXED_TODAY"):
+            return current_app.config["FIXED_TODAY"]
+        return datetime.now(app_timezone(current_app.config.get("APP_TIMEZONE") or "Asia/Kolkata")).date()
     return date.today()

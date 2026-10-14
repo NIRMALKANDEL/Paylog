@@ -756,6 +756,14 @@ textarea.form-input { line-height: 1.5; }
 .goal-meta dd { font-size: 0.92rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .contribute-form { display: flex; gap: 0.5rem; }
 .contribute-form .form-input { flex: 1; min-width: 0; }
+/* Shared expenses */
+.split-share { align-items: center; margin: 0.4rem 0; }
+.split-share label { flex: 1; min-width: 0; font-size: 0.9rem; }
+.split-share .form-input { flex: 0 0 8rem; }
+.settle-row { align-items: center; padding: 0.35rem 0; }
+.settle-row .btn-sm { flex-shrink: 0; }
+.settle-history { margin-top: 1.25rem; }
+.split-rename { margin-top: 0.75rem; }
 .goal-new { border-style: dashed; border-color: var(--border); background: color-mix(in srgb, var(--glass) 55%, transparent); }
 
 /* Tables */

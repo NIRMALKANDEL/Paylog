@@ -1,9 +1,12 @@
-from flask import Blueprint, g, render_template, request
+import csv
+import io
+
+from flask import Blueprint, Response, g, render_template, request
 
 from database.db import get_db
 from services import analytics
-from services.dates import add_months, month_start, parse_date, parse_optional_date, today
-from services.money import format_money
+from services.dates import add_months, month_end, month_label, month_start, parse_date, parse_optional_date, today
+from services.money import cents_to_input, format_money
 from services.security import login_required
 
 bp = Blueprint("analytics", __name__, url_prefix="/analytics")
@@ -93,3 +96,49 @@ def index():
         by_cat_month=by_cat_month,
         chart_data=chart_data,
     )
+
+
+def report_csv(db, user_id, start, end):
+    """A spreadsheet-friendly report of one period: totals, each month, each category."""
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    summary = analytics.totals(db, user_id, start, end)
+
+    def rate(value):
+        return "" if value is None else f"{value:.1f}"
+
+    writer.writerow(["Paylog report", start.isoformat(), end.isoformat()])
+    writer.writerow([])
+    writer.writerow(["credit", "debit", "net", "savings_rate_percent"])
+    writer.writerow([cents_to_input(summary["income"]), cents_to_input(summary["expense"]),
+                     ("-" if summary["net"] < 0 else "") + cents_to_input(abs(summary["net"])),
+                     rate(summary["savings_rate"])])
+    writer.writerow([])
+    writer.writerow(["month", "credit", "debit", "net", "savings_rate_percent"])
+    for key in analytics.month_keys_between(start, end):
+        first = parse_date(f"{key}-01")
+        month = analytics.totals(db, user_id, max(first, start), min(month_end(first), end))
+        writer.writerow([month_label(key), cents_to_input(month["income"]), cents_to_input(month["expense"]),
+                         ("-" if month["net"] < 0 else "") + cents_to_input(abs(month["net"])),
+                         rate(month["savings_rate"])])
+    for kind, title in (("expense", "debit_category"), ("income", "credit_category")):
+        rows = analytics.category_totals(db, user_id, start, end, kind=kind)
+        if rows:
+            writer.writerow([])
+            writer.writerow([title, "amount", "share_percent", "transactions"])
+            for c in rows:
+                writer.writerow([c["category"], cents_to_input(c["total"]), f"{c['share']:.1f}", c["count"]])
+    filename = f"paylog-report-{start.isoformat()}-to-{end.isoformat()}.csv"
+    return Response(
+        "\ufeff" + buffer.getvalue(),  # BOM so Excel opens UTF-8 correctly
+        mimetype="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@bp.route("/report.csv")
+@login_required
+def report():
+    db = get_db()
+    _, start, end = resolve_range(request.args, db, g.user["id"], today())
+    return report_csv(db, g.user["id"], start, end)

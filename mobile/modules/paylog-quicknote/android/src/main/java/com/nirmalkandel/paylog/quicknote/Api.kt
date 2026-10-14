@@ -17,10 +17,13 @@ internal object Api {
   /**
    * One line ("250 lunch") -> saved transaction. Same endpoint the app uses.
    * `kind` ("expense" / "income") is the card's − / + switch; null lets the words decide.
+   * `clientId` names this note: if it is sent again (the reply was lost on a bad
+   * connection), the server returns the saved entry instead of saving it twice.
    */
-  fun quickAdd(context: Context, line: String, writtenOn: String, kind: String?): JSONObject {
+  fun quickAdd(context: Context, line: String, writtenOn: String, kind: String?, clientId: String?): JSONObject {
     val body = JSONObject().put("q", line).put("written_on", writtenOn)
     if (kind != null) body.put("kind", kind)
+    if (clientId != null) body.put("client_id", clientId)
     return call(context, "POST", "/transactions/quick", body)
   }
 

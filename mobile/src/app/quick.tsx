@@ -1,7 +1,8 @@
 // The notes-style quick add inside the app: the "+" tab, the dashboard box and
 // the iOS widget (paylog://quick?from=widget). The Android widget uses the
 // native quick note instead (modules/paylog-quicknote), which never opens the app.
-// Each line is one entry: "250 lunch", "salary 65000", "2k rent yesterday".
+// Each line is one entry: "250 lunch", "salary 65000", "2k rent yesterday". Commas and
+// semicolons separate entries too ("250 lunch, 40 tea"), but not inside a number ("1,250").
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
@@ -20,8 +21,28 @@ import { refreshWidgets, updateWidgets } from '@/lib/widget';
 const MAX_LINES = 10;
 const EXAMPLES = ['250 lunch', 'salary 65000', '2k rent', 'uber 180 yesterday', '900 on 12 sep'];
 
+const isDigit = (ch: string | undefined) => !!ch && ch >= '0' && ch <= '9';
+
+/** Same rule as split_entries() on the server: a comma between "1" and "250" groups digits. */
 function linesOf(text: string) {
-  return text.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, MAX_LINES);
+  const parts: string[] = [];
+  let current = '';
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === ',' || ch === ';' || ch === '\n' || ch === '\r') {
+      const group = text.slice(i + 1).match(/^\d{2,3}(?!\d)/);
+      if (ch === ',' && isDigit(text[i - 1]) && group) {
+        current += ch;
+        continue;
+      }
+      parts.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  parts.push(current);
+  return parts.map((l) => l.trim()).filter(Boolean).slice(0, MAX_LINES);
 }
 
 export default function Quick() {
@@ -161,9 +182,9 @@ export default function Quick() {
           }}
           autoFocus
           multiline
-          placeholder={'250 lunch\n+1200 from Rahul'}
+          placeholder={'250 lunch, 40 tea\n+1200 from Rahul'}
           placeholderTextColor={colors.faint}
-          accessibilityLabel="Quick entry. One transaction per line."
+          accessibilityLabel="Quick entry. One transaction per line, or separate them with commas."
           style={{ fontSize: 22, lineHeight: 34, color: colors.ink, minHeight: 150, textAlignVertical: 'top', padding: 0 }}
         />
 

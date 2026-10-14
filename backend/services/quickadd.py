@@ -42,6 +42,33 @@ QUICK_INCOME_KEYWORDS = [
 ]
 
 
+ENTRY_SEPARATORS = ",;\n\r"
+# "1,250" and "1,25,000": a comma between digits that groups them isn't a separator.
+_NUMBER_GROUP = re.compile(r"\d{2,3}(?!\d)")
+
+
+def split_entries(text):
+    """Several quick entries in one go: "250 lunch, 40 tea; salary 65000" -> three entries.
+
+    Commas, semicolons and new lines separate entries, except a comma inside a
+    number ("1,250 rent" is one entry). Type "250, 40" with a space to mean two.
+    The app and the Android quick note split the same way (quick.tsx, Widgets.kt).
+    """
+    text = text or ""
+    parts, current = [], []
+    for i, ch in enumerate(text):
+        if ch in ENTRY_SEPARATORS:
+            if ch == "," and i > 0 and text[i - 1].isdigit() and _NUMBER_GROUP.match(text, i + 1):
+                current.append(ch)
+                continue
+            parts.append("".join(current))
+            current = []
+        else:
+            current.append(ch)
+    parts.append("".join(current))
+    return [p.strip() for p in parts if p.strip()]
+
+
 def _strip_dates(text, today):
     """Remove date phrases from text and return (text_without_dates, date)."""
     day = None

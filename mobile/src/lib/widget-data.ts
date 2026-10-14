@@ -28,7 +28,8 @@ export async function fetchWidgetData(currency: string, previous?: WidgetData): 
   if (!(await loadToken())) return { signedIn: false };
   const now = new Date();
   const start = toISO(new Date(now.getFullYear(), now.getMonth(), 1));
-  const data = await api<{ summary: { expense: number } }>(`/transactions?kind=expense&start=${start}`);
+  const end = toISO(new Date(now.getFullYear(), now.getMonth() + 1, 0)); // future-dated entries aren't this month's spending
+  const data = await api<{ summary: { expense: number } }>(`/transactions?kind=expense&start=${start}&end=${end}`);
   return {
     ...previous,
     signedIn: true,

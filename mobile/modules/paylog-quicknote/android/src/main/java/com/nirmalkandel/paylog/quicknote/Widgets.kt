@@ -37,6 +37,28 @@ internal object Notes {
     return parts.filter { it.isNotBlank() }.joinToString(" · ")
   }
 
-  fun lines(text: String): List<String> =
-    text.split('\n').map { it.trim() }.filter { it.isNotEmpty() }.take(10)
+  /**
+   * One entry per line, comma or semicolon ("250 lunch, 40 tea"), like split_entries() on
+   * the server: a comma that groups digits ("1,250", "1,25,000") stays part of the number.
+   */
+  fun lines(text: String): List<String> {
+    val parts = mutableListOf<String>()
+    val current = StringBuilder()
+    for ((i, ch) in text.withIndex()) {
+      if (ch == ',' || ch == ';' || ch == '\n' || ch == '\r') {
+        if (ch == ',' && i > 0 && text[i - 1].isDigit() && NUMBER_GROUP.containsMatchIn(text.substring(i + 1))) {
+          current.append(ch)
+          continue
+        }
+        parts += current.toString()
+        current.setLength(0)
+      } else {
+        current.append(ch)
+      }
+    }
+    parts += current.toString()
+    return parts.map { it.trim() }.filter { it.isNotEmpty() }.take(10)
+  }
+
+  private val NUMBER_GROUP = Regex("^\\d{2,3}(?!\\d)")
 }

@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     reference    TEXT,
     time         TEXT,
     method       TEXT,
+    client_id    TEXT,
     created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions (user_id, date);
@@ -75,6 +76,56 @@ CREATE TABLE IF NOT EXISTS api_tokens (
     expires_at   TEXT    NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens (user_id);
+
+-- Shared expenses (Splitwise-style). A group belongs to one Paylog account; its
+-- members are names (friends don't need accounts). Kept apart from personal
+-- transactions. Balances are computed from expenses, shares and settlements.
+CREATE TABLE IF NOT EXISTS split_groups (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name         TEXT    NOT NULL,
+    created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_split_groups_user ON split_groups (user_id);
+
+CREATE TABLE IF NOT EXISTS split_members (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id     INTEGER NOT NULL REFERENCES split_groups(id) ON DELETE CASCADE,
+    name         TEXT    NOT NULL COLLATE NOCASE,
+    is_me        INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (group_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS split_expenses (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id     INTEGER NOT NULL REFERENCES split_groups(id) ON DELETE CASCADE,
+    paid_by      INTEGER NOT NULL REFERENCES split_members(id),
+    amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+    description  TEXT    NOT NULL DEFAULT '',
+    date         TEXT    NOT NULL,
+    split        TEXT    NOT NULL CHECK (split IN ('equal', 'exact')),
+    created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_split_expenses_group ON split_expenses (group_id, date);
+
+CREATE TABLE IF NOT EXISTS split_shares (
+    expense_id   INTEGER NOT NULL REFERENCES split_expenses(id) ON DELETE CASCADE,
+    member_id    INTEGER NOT NULL REFERENCES split_members(id),
+    share_cents  INTEGER NOT NULL CHECK (share_cents >= 0),
+    PRIMARY KEY (expense_id, member_id)
+);
+
+CREATE TABLE IF NOT EXISTS split_settlements (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id     INTEGER NOT NULL REFERENCES split_groups(id) ON DELETE CASCADE,
+    from_member  INTEGER NOT NULL REFERENCES split_members(id),
+    to_member    INTEGER NOT NULL REFERENCES split_members(id),
+    amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
+    date         TEXT    NOT NULL,
+    created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+    CHECK (from_member != to_member)
+);
+CREATE INDEX IF NOT EXISTS idx_split_settlements_group ON split_settlements (group_id);
 
 CREATE TABLE IF NOT EXISTS goals (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -117,6 +168,9 @@ MIGRATIONS = [
     ("users", "auto_save_receipts", "INTEGER NOT NULL DEFAULT 1"),  # no longer used: scans are always reviewed
     ("transactions", "time", "TEXT"),    # HH:MM, optional (read from payment screenshots)
     ("transactions", "method", "TEXT"),  # payment app or method: Google Pay, Cash, Card... optional
+    # Random id the phone gives each quick note, so a note re-sent after a dropped
+    # connection is recognised instead of saved twice.
+    ("transactions", "client_id", "TEXT"),
 ]
 
 
@@ -126,6 +180,8 @@ def migrate(db):
         if column not in existing:
             db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
     db.execute("CREATE INDEX IF NOT EXISTS idx_transactions_user_reference ON transactions (user_id, reference)")
+    db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_user_client_id ON transactions (user_id, client_id)"
+               " WHERE client_id IS NOT NULL")
     # The demo sandbox was removed; clear out any throwaway demo accounts left behind.
     if "is_demo" in {row["name"] for row in db.execute("PRAGMA table_info(users)")}:
         db.execute("DELETE FROM users WHERE is_demo = 1")

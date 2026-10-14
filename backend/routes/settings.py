@@ -147,8 +147,8 @@ def export_json():
         "exported_at": today().isoformat(),
         "profile": {"name": user["name"], "email": user["email"], "currency": user["currency"],
                     "monthly_budget_cents": user["monthly_budget_cents"]},
-        "transactions": rows("SELECT kind, amount_cents, category, date, description FROM transactions"
-                             " WHERE user_id = ? ORDER BY date"),
+        "transactions": rows("SELECT kind, amount_cents, category, date, description, time, method, reference"
+                             " FROM transactions WHERE user_id = ? ORDER BY date"),
         "budgets": rows("SELECT category, amount_cents FROM budgets WHERE user_id = ?"),
         "goals": rows("SELECT name, target_cents, saved_cents, target_date FROM goals WHERE user_id = ?"),
         "recurring": rows("SELECT kind, amount_cents, category, description, frequency, next_date, active"

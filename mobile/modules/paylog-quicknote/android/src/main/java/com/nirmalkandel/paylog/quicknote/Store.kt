@@ -57,11 +57,12 @@ internal object Store {
   // ---- Notes waiting for the network ----------------------------------------
 
   /** Each pending note keeps the day it was written so "yesterday" stays right. */
-  fun enqueue(context: Context, lines: List<String>, writtenOn: String, kind: String?) {
+  fun enqueue(context: Context, lines: List<String>, writtenOn: String, kind: String?, clientIds: List<String>) {
     val queue = pending(context)
-    for (line in lines) {
+    for ((i, line) in lines.withIndex()) {
       if (queue.length() >= MAX_PENDING) break
-      val note = JSONObject().put("q", line).put("on", writtenOn)
+      // Keep the id the first attempt used: that attempt may have reached the server.
+      val note = JSONObject().put("q", line).put("on", writtenOn).put("id", clientIds[i])
       if (kind != null) note.put("kind", kind) // the − / + chosen on the card
       queue.put(note)
     }

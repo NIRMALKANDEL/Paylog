@@ -11,6 +11,7 @@ import androidx.work.Worker
 import androidx.work.WorkerParameters
 import org.json.JSONArray
 import java.io.IOException
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /** Sends quick notes written offline as soon as the phone is back online, app open or not. */
@@ -30,7 +31,9 @@ class SyncWorker(context: Context, params: WorkerParameters) : Worker(context, p
       }
       try {
         val kind = if (note.has("kind")) note.getString("kind") else null
-        lastSaved = Notes.describe(Api.quickAdd(context, note.getString("q"), note.getString("on"), kind))
+        // Notes queued by an older version have no id: give them one now, kept if this attempt fails.
+        if (!note.has("id")) note.put("id", UUID.randomUUID().toString())
+        lastSaved = Notes.describe(Api.quickAdd(context, note.getString("q"), note.getString("on"), kind, note.getString("id")))
         sent++
       } catch (e: IOException) {
         left.put(note)

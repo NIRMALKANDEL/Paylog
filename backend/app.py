@@ -6,7 +6,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import INSTANCE_DIR, Config, load_secret_key
 from database import db as database
-from routes import analytics, api, auth, budgets, goals, main, receipts, recurring, settings, transactions
+from routes import analytics, api, auth, budgets, goals, main, receipts, recurring, settings, split, transactions
 from services import categories
 from services.backup import ensure_daily_backup
 from services.dates import today
@@ -35,7 +35,7 @@ def create_app(test_config=None):
 
     database.init_app(app)
 
-    for module in (auth, main, transactions, receipts, budgets, goals, recurring, analytics, settings, api):
+    for module in (auth, main, transactions, receipts, budgets, goals, recurring, split, analytics, settings, api):
         app.register_blueprint(module.bp)
 
     @app.before_request

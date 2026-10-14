@@ -69,6 +69,27 @@
 </section>
 {% endif %}
 
+{% if upcoming %}
+<section class="card">
+    <div class="card-head">
+        <h2 class="card-title">{{ m.icon("repeat", 18) }} Coming up this week</h2>
+        <a href="{{ url_for('recurring.index') }}" class="link small">Recurring →</a>
+    </div>
+    <ul class="tx-list">
+        {% for r in upcoming %}
+        <li class="tx-row">
+            <span class="tx-cat cat-dot" data-kind="{{ r.kind }}">{{ r.category[:1] }}</span>
+            <div class="tx-main">
+                <span class="tx-desc">{{ r.description or r.category }}</span>
+                <span class="tx-meta">{{ r.frequency|title }} · due {{ r.next_date }}</span>
+            </div>
+            {{ m.amount(r) }}
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+
 <div class="grid-2">
     <section class="card">
         <div class="card-head">
